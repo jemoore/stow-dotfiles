@@ -1,0 +1,25 @@
+#!/bin/bash
+
+LOG_DIR=/home/${USER}/.local/log
+mkdir ${LOG_DIR}
+LOG_FILE=${LOG_DIR}/"$(date +'%Y-%m-%d-%H-%M-%S')-update.log"
+
+echo "Updating system..." | tee -a "${LOG_FILE}"
+
+APT_CMD=$(which apt)
+DNF_CMD=$(which dnf)
+
+if [[ ! -z $DNF_CMD ]]; then
+	sudo dnf update -y | tee -a "${LOG_FILE}"
+	
+	echo "Clean up..." | tee -a "${LOG_FILE}"
+	
+	sudo dnf clean all | tee -a "${LOG_FILE}"
+elif [[ ! -z $APT_CMD ]]; then
+	sudo apt update | tee -a "${LOG_FILE}"
+	sudo apt upgrade -y | tee -a "${LOG_FILE}"
+else
+	echo "Unknow Linux system! Cannot update!" | tee -a "${LOG_FILE}"
+fi
+
+echo "All done!" | tee -a "${LOG_FILE}"

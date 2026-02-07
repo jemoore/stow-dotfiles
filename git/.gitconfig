@@ -1,0 +1,65 @@
+[user]
+  email = jeff.moore.email@gmail.com
+  name = Jeff Moore
+
+[gui]
+
+[core]
+  editor = vim
+  ignorecase = false
+  excludesfile = ~/.gitignore_global
+  autocrlf = input
+
+[alias]
+  c = commit
+  g = grep --break --heading --line-number
+  s = status
+  d = diff
+  ls = log --abbrev-commit --no-merges --pretty='%h (%ad) - [%an] %s %d' --date=format:'%b %d %Y'
+  ll = log --no-merges --pretty='\n\n%C(bold yellow)[%cn] %C(bold red)(%cr) %C(bold green)%s' --decorate --numstat
+  sl = log --graph --branches HEAD --format=format:'%h %an %C(auto,green) %D%C(auto,reset)%n %s%n'
+  search = log --no-merges -i -E --pretty='%h (%ad) - [%an] %s %d' --date=format:'%b %d %Y' --grep
+  contributions = log --no-merges --author="jeff.moore.email" --pretty='%ad - %s' --date=format:'%b %d %Y (%I:%M %p)'
+  flow = log --no-merges --author="jeff.moore.email" --stat --pretty='\n\n%C(bold blue)[%h] %C(bold yellow)%ad (%cr) %C(green)- %s' --date=format:'%b %d %Y'
+  # ATTENTION: All aliases prefixed with ! run in /bin/sh make sure you use sh syntax, not bash/zsh or whatever
+  recentb = "!r() { refbranch=$1 count=$2; git for-each-ref --sort=-committerdate refs/heads --format='%(refname:short)|%(HEAD)%(color:yellow)%(refname:short)|%(color:bold green)%(committerdate:relative)|%(color:blue)%(subject)|%(color:magenta)%(authorname)%(color:reset)' --color=always --count=${count:-20} | while read line; do branch=$(echo \"$line\" | awk 'BEGIN { FS = \"|\" }; { print $1 }' | tr -d '*'); ahead=$(git rev-list --count \"${refbranch:-origin/master}..${branch}\"); behind=$(git rev-list --count \"${branch}..${refbranch:-origin/master}\"); colorline=$(echo \"$line\" | sed 's/^[^|]*|//'); echo \"$ahead|$behind|$colorline\" | awk -F'|' -vOFS='|' '{$5=substr($5,1,70)}1' ; done | ( echo \"ahead|behind||branch|lastcommit|message|author\\n\" && cat) | column -ts'|';}; r"
+
+[grep]
+  lineNumber = true
+  extendRegexp = true
+
+[color]
+  ui = true
+  interactive = auto
+  branch = auto
+  diff = auto
+  status = auto
+
+[color "branch"]
+  current = green bold
+  local = green
+  remote = red bold
+
+[color "diff"]
+  meta = yellow bold ul
+  frag = cyan bold ul
+  old = red bold
+  new = green bold
+
+[color "status"]
+  added = green bold
+  changed = yellow bold
+  untracked = red bold
+
+[filter "lfs"]
+  smudge = git-lfs smudge %f
+  required = true
+  clean = git-lfs clean %f
+
+[push]
+  default = simple
+
+[gui]
+	recentrepo = C:/Users/jeffe/dev/cpp/CellularAutomaton
+[init]
+	defaultBranch = main

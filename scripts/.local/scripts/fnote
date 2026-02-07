@@ -1,0 +1,25 @@
+#!/usr/bin/bash
+
+RESULTS_FILE=/tmp/fnote_cache.txt
+NOTES_DIR=/mnt/data/Documents/md/kb
+
+if [[ -s ${RESULTS_FILE} ]]; then
+    rm -f ${RESULTS_FILE}
+fi
+
+if [[ $# -lt 1 || $1 = "-h" ]]
+then
+    echo "usage: $(basename $0) [-t] search-term"
+    echo "       -t search note titles only for *search-term*"
+    echo "          search note contents for *search-term*"
+    exit
+elif [[ $1 = "-t" ]]
+then
+    find ${NOTES_DIR} -name "*$2*" -type f > ${RESULTS_FILE}
+else
+    find ${NOTES_DIR} -type f 2>/dev/null | xargs grep -si --color -n "$1" > ${RESULTS_FILE}
+fi
+
+if [[ -s ${RESULTS_FILE} ]]; then
+    vim ${RESULTS_FILE}
+fi

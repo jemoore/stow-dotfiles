@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+# show possible foreground and background color combos
+
+for fg in {30..37}; do
+  for bg in {40..47}; do
+    printf "\e[${fg};${bg}m fg=${fg} bg=${bg} \e[0m\n"
+  done
+done
+

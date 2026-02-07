@@ -1,0 +1,15 @@
+#!/bin/sh
+
+test -z "$1" && echo "Supply a directory as argument." && exit 1
+
+[ ! -d "$1" ] && echo "Directory $1 DOES NOT exists." && exit 1
+
+cd "$1"
+
+python -m venv venv
+source venv/bin/activate
+
+python -m pip install -U mypy
+pip install pylint
+pip install black
+

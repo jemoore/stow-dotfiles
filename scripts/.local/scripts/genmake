@@ -1,0 +1,61 @@
+#!/usr/bin/bash
+
+[[ -f ./makefile ]] && echo "makefile already exists." && exit 1
+
+cat > ./makefile << "EOF"
+# expects 2 existing directories: ./src ./include
+# expects ./src/main.cpp to exist
+# compiles to ./build/objects and ./build/apps
+
+CXX      := g++
+CXXFLAGS := -Wall -Wextra -Werror
+LDFLAGS  := -L/usr/lib -lstdc++ -lm
+BUILD    := ./build
+OBJ_DIR  := $(BUILD)/objects
+APP_DIR  := $(BUILD)/apps
+TARGET   := main
+INCLUDE  := -Iinclude/
+
+# if additional dirs added under ./src, add line to SRC below
+# e.g $(wildcard src/module/*.cpp) \
+SRC      := $(wildcard src/*.cpp)
+
+OBJECTS  := $(SRC:%.cpp=$(OBJ_DIR)/%.o)
+DEPENDENCIES := $(OBJECTS:.o=.d)
+
+all: build $(APP_DIR)/$(TARGET)
+
+$(OBJ_DIR)/*.o: %.cpp
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) $(INCLUDE) -c $< -MMD -o $@
+
+$(APP_DIR)/$(TARGET): $(OBJECTS)
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -o $(APP_DIR)/$(TARGET) $^ $(LDFLAGS)
+
+-include $(DEPENDENCIES)
+
+.PHONY: all build clean debug release info
+
+build:
+	@mkdir -p $(APP_DIR)
+	@mkdir -p $(OBJ_DIR)
+
+debug: CXXFLAGS += -DDEBUG -g
+debug: all
+
+release: CXXFLAGS += -O2
+release: all
+
+clean:
+	-@rm -rvf $(OBJ_DIR)/*
+	-@rm -rvf $(APP_DIR)/*
+
+info:
+	@echo "-- App dir:       ${APP_DIR}"
+	@echo "-- Obj dir:       ${OBJ_DIR}"
+	@echo "-- Src dir:       ${SRC}"
+	@echo "-- Objects:       ${OBJECTS}"
+	@echo "-- Dependencies:  ${DEPENDENCIES}"
+
+EOF

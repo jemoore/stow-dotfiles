@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+# Copy this script into /etc/X11/Xsession.d
+# as 98autoxrandr
+# Monitors are detected as connected/unconnected and xrandr
+# is called to configure them at startup
+
+DISCONNECTED=$(xrandr -q | awk '/ disconnected / {print $1}')
+CONNECTED=$(xrandr -q | awk '/ connected / {print $1}')
+
+LAPTOP="eDP-1-1"
+MON1="DP-0"
+MON2="HDMI-0"
+
+isLaptopConnected () {
+    [[ " ${CONNECTED[@]} " =~ "${LAPTOP}" ]]
+}
+isMON1Connected () {
+    [[ " ${CONNECTED[@]} " =~ "${MON1}" ]]
+}
+isMON2Connected () {
+    [[ " ${CONNECTED[@]} " =~ "${MON2}" ]]
+}
+
+    
+PARMS=""
+
+if isLaptopConnected; then
+    if isMON1Connected || isMON2Connected; then
+	PARMS="${PARMS} --output ${LAPTOP} --off"
+    else
+	PARMS="${PARMS} --output ${LAPTOP} --primary --auto"
+    fi
+fi
+
+if isMON1Connected; then
+    PARMS="${PARMS} --output ${MON1} --primary --mode 2560x1440 --pos 0x0 --rotate normal"
+fi
+
+if isMON2Connected; then
+    if isMON1Connected; then
+	PARMS="${PARMS} --output ${MON2} --mode 2560x1440 --pos 2560x0 --rotate normal"
+    else
+	PARMS="${PARMS} --output ${MON2} --primary --mode 2560x1440 --pos 0x0 --rotate normal"
+    fi
+fi
+
+for M in ${DISCONNECTED[@]}
+do
+    PARMS="${PARMS} --output ${M} --off"
+done
+
+xrandr ${PARMS}
