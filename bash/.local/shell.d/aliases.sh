@@ -132,6 +132,13 @@ export FZF_DEFAULT_COMMAND="rg --files --hidden"
 alias cpcmd="history | cut -c 8- | uniq | fzf | xclip -i -r -sel clipboard"
 alias c='file=$(rg --files --hidden | fzf | sed "s~/[^/]*$~/~");[[ "$file" == "" ]]|| cd "$file"'
 
+# aliases for fzf searching and opening files
+## ft is a custom bash function defined in funcs.sh
+## that uses fzf to find files and open them in
+## vim/nvim or system default app based on MIME type
+alias fn='ft /mnt/data/Documents/md/kb'
+alias fb='ft /mnt/data/Documents/Books'
+
 # doom emacs
 export PATH="$PATH:$HOME/.emacs.d/bin/"
 
