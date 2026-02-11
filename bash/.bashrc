@@ -13,18 +13,18 @@ fi
 
 SHELL_SCRIPTS_DIR=$HOME/.local/shell.d
 
-source "$SHELL_SCRITPS_DIR/detection.sh"
-source "$SHELL_SCRITPS_DIR/path.sh"
-source "$SHELL_SCRITPS_DIR/history.bash"
-source "$SHELL_SCRITPS_DIR/settings.bash"
-source "$SHELL_SCRITPS_DIR/new_prompt.sh"
-source "$SHELL_SCRITPS_DIR/colors.bash"
-source "$SHELL_SCRITPS_DIR/dircolors.sh"
-source "$SHELL_SCRITPS_DIR/completion.bash"
-source "$SHELL_SCRITPS_DIR/termcap-colors.sh"
-source "$SHELL_SCRITPS_DIR/funcs.sh"
-source "$SHELL_SCRITPS_DIR/aliases.sh"
-source "$SHELL_SCRITPS_DIR/envx.bash"
+source "$SHELL_SCRIPTS_DIR/detection.sh"
+source "$SHELL_SCRIPTS_DIR/path.sh"
+source "$SHELL_SCRIPTS_DIR/history.bash"
+source "$SHELL_SCRIPTS_DIR/settings.bash"
+source "$SHELL_SCRIPTS_DIR/prompt.sh"
+source "$SHELL_SCRIPTS_DIR/colors.bash"
+source "$SHELL_SCRIPTS_DIR/dircolors.sh"
+source "$SHELL_SCRIPTS_DIR/completion.bash"
+source "$SHELL_SCRIPTS_DIR/termcap-colors.sh"
+source "$SHELL_SCRIPTS_DIR/funcs.sh"
+source "$SHELL_SCRIPTS_DIR/aliases.sh"
+source "$SHELL_SCRIPTS_DIR/envx.bash"
 
 # not worried about sharing publicly
 test -r ~/.bash_personal && source ~/.bash_personal
