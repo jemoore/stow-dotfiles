@@ -67,7 +67,8 @@ install_media_codecs () {
 	dnf -y install lame\* --exclude=lame-devel
 	error_check $? "Failed on install of lame codecs"
 
-	dnf group upgrade --with-optional Multimedia
+	# dnf group upgrade --with-optional Multimedia
+	dnf group upgrade --skip-unavailable Multimedia
 	error_check $? "Failed on group upgrade Multimedia"
 }
 
