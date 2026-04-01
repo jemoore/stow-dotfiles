@@ -72,7 +72,7 @@ alias gdev='cd /media/data/dev'
 alias gkb='cd /media/data/Documents/kb'
 alias valias='vim $HOME/dev/github.com/jemoore/dotfiles/shell.d/aliases.sh'
 alias v3='vim $HOME/dev/github.com/jemoore/dotfiles/i3/config'
-alias vn='vim /mnt/data/Documents/md/kb/MOC.md'
+alias vn='vim $HOME/Documents/mdnotes/MOC.md'
 alias home='cd ~'
 alias mkdir='mkdir -pv'
 alias mv='mv -iv'
@@ -136,9 +136,9 @@ alias c='file=$(rg --files --hidden | fzf | sed "s~/[^/]*$~/~");[[ "$file" == ""
 ## ft and ff are custom bash functions defined in funcs.sh
 ## that uses fzf to find files and open them in
 ## vim/nvim or system default app based on MIME type
-alias fn='ft /mnt/data/Documents/md/kb'
-alias ffn='ff /mnt/data/Documents/md/kb'
-alias fb='ft /mnt/data/Documents/Books'
+alias fn='ft  $HOME/Documents/mdnotes'
+alias ffn='ff $HOME/Documents/mdnotes'
+alias fb='ft  /mnt/data/Documents/Books'
 alias ffb='ff /mnt/data/Documents/Books'
 
 # doom emacs
