@@ -5,6 +5,13 @@
       (setq jeff/dotfiles (concat jeff/home "dev/github.com/jemoore/dotfiles/"))
       (setq jeff/kb "/mnt/data/Documents/KB/")
       (setq jeff/md "/mnt/data/Documents/md/")))
+(if (eq system-type 'darwin)
+    (progn
+      (setq jeff/home "/Users/jeff/")
+      (setq jeff/dev (concat jeff/home "dev/github.com/jemoore/"))
+      (setq jeff/dotfiles (concat jeff/dev "stow-dotfiles/"))
+      (setq jeff/kb (concat jeff/dev "KB/"))
+      (setq jeff/md (concat jeff/dev "mdnotes/"))))
 (if (eq system-type 'windows-nt)
     (progn
       (if msystem
