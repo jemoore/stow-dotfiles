@@ -42,7 +42,6 @@ cdpathprepend() {
 
 pathprepend \
 	"${SCRIPTS}" \
-	"${HOME}/sdk/go1.16/bin" \
 	"${HOME}/.local/bin" \
 	"${HOME}/.local/go/bin" \
 	"${HOME}/.cargo/bin" \
@@ -78,3 +77,7 @@ if test -n "$REPOS"; then
 		"/media/$USER" \
 		"$HOME"
 fi
+
+# doom emacs
+export PATH="$PATH:$HOME/.emacs.d/bin/"
+

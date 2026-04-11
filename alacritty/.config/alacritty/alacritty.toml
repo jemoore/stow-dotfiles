@@ -47,7 +47,7 @@ render_timer = false
 TERM = "alacritty"
 
 [font]
-size = 14
+size = 16
 
 [font.bold]
 family = "GoMono Nerd Font"
