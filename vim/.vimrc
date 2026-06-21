@@ -7,6 +7,9 @@
 "
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
+" For Mac Os X
+set clipboard=unnamed
+
 " Use 4 spaces instead of tabs
 set tabstop=4                           " number of visual spaces per tab
 set softtabstop=4                       " number of spaces in tab while editing
@@ -50,7 +53,7 @@ set tags=./tags;/                     " look for tags file in cur dir, work up t
 set tags+=/some/dir               " add an additional dir to search for tags
 
 set scrolloff=8
-set colorcolumn=80                      " display a vertical line at this column(s)
+set colorcolumn=120                     " display a vertical line at this column(s)
 hi ColorColumn ctermbg=lightgrey guibg=lightgrey | " make the vertical line lightgrey
 
 " Enable folding
@@ -114,11 +117,12 @@ Plug 'tpope/vim-commentary'             " gcc, gc, 5gc
 Plug 'ap/vim-css-color'
 Plug 'octol/vim-cpp-enhanced-highlight'
 Plug 'mboughaba/i3config.vim'
-Plug 'sirver/ultisnips'
-let g:UltiSnipsExpandTrigger = '<tab>'
-let g:UltiSnipsJumpForwardTrigger = '<tab>'
-let g:UltiSnipsJumpBackwardTrigger = '<s-tab>'
-let g:UltiSnipsSnippetDirectories=["UltiSnips", "MyUltiSnips"]
+"Plug 'sirver/ultisnips'
+"
+"let g:UltiSnipsExpandTrigger = '<tab>'
+"let g:UltiSnipsJumpForwardTrigger = '<tab>'
+"let g:UltiSnipsJumpBackwardTrigger = '<s-tab>'
+"let g:UltiSnipsSnippetDirectories=["UltiSnips", "MyUltiSnips"]
 
 call plug#end()                         " vim-plug plugins should not be declared below this
 
