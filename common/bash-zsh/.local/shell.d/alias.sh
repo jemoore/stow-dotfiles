@@ -24,6 +24,7 @@ alias fn='ft  $HOME/dev/github.com/jemoore/mdnotes'
 alias ffn='ff $HOME/dev/github.com/jemoore/mdnotes'
 alias fb='ft  $HOME/Documents/Books'
 alias ffb='ff $HOME/Documents/Books'
+alias cn='ffc $HOME/dev/github.com/jemoore/mdnotes'
 
 alias ogemma='ollama run gemma4:latest --hidethinking'
 alias oqwen='ollama run qwen3.5:9b --hidethinking'

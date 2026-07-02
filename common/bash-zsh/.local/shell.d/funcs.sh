@@ -204,6 +204,38 @@ ff() {
   fi
 }
 
+# Opens a file in a given directory in vim/nvim
+ffc() {
+  if [ -z "$1" ]; then
+    echo "Usage: ff <directory> <file_name>"
+    return 1
+  fi
+
+  # Directory should exist
+  if [ ! -d "$1" ]; then
+    echo "Directory does not exist: $1"
+    return 1
+  fi
+
+  local TARGET_DIR="$1"
+
+  # Check if a filename was provided as an argument ($1)
+  if [ -z "$2" ]; then
+    echo "Usage: nvimnew <filename>"
+    echo "Example: nvimnew README.md"
+    return 1
+  fi
+
+  local FILENAME="$2"
+
+  nvim "$TARGET_DIR/$FILENAME"
+  if command -v nvim &>/dev/null; then
+    nvim "$TARGET_DIR/$FILENAME"
+  else
+    vim "$TARGET_DIR/$FILENAME"
+  fi
+}
+
 # Compression
 compress() { tar -czf "${1%/}.tar.gz" "${1%/}"; }
 alias decompress="tar -xzf"
