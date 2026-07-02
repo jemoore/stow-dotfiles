@@ -1,14 +1,16 @@
-#+title: Emacs From Scratch Configuration
+#+title: My Emacs Configuration
 #+PROPERTY: header-args:emacs-lisp :tangle ~/.emacs.d/init.el :mkdirp yes
 
 * Welcome!
 
-This configuration started based on the *Emacs From Scratch* series, but has evolved over time.
+This configuration started based on the *Emacs From Scratch* series, but has evolved extensively over time.
 This file generates [[file:init.el][init.el]] which can be loaded by Emacs at startup.
 
 Links to repos or sites I have acquire some setup examples:
 - https://systemcrafters.cc/
 - https://github.com/jakebox/jake-emacs
+
+I also used Claude Opus 4.8 to help in fixing bugs and changing many of the packages.
 
 The following is some initial font setup.
 #+begin_src emacs-lisp
@@ -35,7 +37,7 @@ I will try to capture them here and hope to keep them in sync with changes to th
   - Fedora:
     - sudo dnf install texlive-scheme-medium
 
-The first time you load your configuration on a new machine, you'll need to run `M-x all-the-icons-install-fonts` so that mode line icons display correctly.  See [[Better Modeline]].
+The first time you load your configuration on a new machine, run `M-x nerd-icons-install-fonts` *and* `M-x all-the-icons-install-fonts` so that mode line and other icons display correctly (otherwise they show as empty boxes).  See [[Better Modeline]].
 
 * Tips for Use
 
@@ -55,12 +57,16 @@ Only use system-type so that you can run emacs in server or client mode.
 
 * System specific setup
 #+begin_src emacs-lisp
+    ;; MSYSTEM_PREFIX is only set when running under MSYS2/MinGW.  Treat msystem
+    ;; as non-nil only when that env var is actually present and non-empty --
+    ;; otherwise (e.g. on macOS/Linux) msystem must be nil so the blocks guarded
+    ;; by `(if (not msystem) ...)' (dashboard, xenops/LaTeX) still run.
     (let ((env-var-value (getenv "MSYSTEM_PREFIX")))
-      (if (not (string-empty-p env-var-value))
+      (if (and env-var-value (not (string-empty-p env-var-value)))
 	  (progn
 	    (setq package-gnupghome-dir "/home/jeff/.emacs.d/elpa/gnupg")
 	    (setq msystem t))
-	(setq msystem f)))
+	(setq msystem nil)))
 #+end_src
 * Package System Setup
 
@@ -88,6 +94,56 @@ Emacs has a built in package manager but it doesn't make it easy to automaticall
 
 #+end_src
 
+** Removing unused packages
+
+Because =use-package-always-ensure= is =t=, every =use-package= form installs its
+package on first load.  When you *remove* or *replace* a package in this file (or
+mark a block =:tangle no=), the old package is no longer referenced but its files
+stay behind in =~/.emacs.d/elpa/=.
+
+To clean those out, run:
+
+: M-x package-autoremove
+
+Emacs computes the set of packages still requested by your config (the "selected"
+packages, tracked in =package-selected-packages= / =custom.el=) and offers to
+delete everything else, including now-orphaned dependencies.
+
+*Tips:*
+- Run =package-autoremove= after any migration/upgrade where you drop packages
+  (e.g. the 2026 move off ivy/counsel/company/org-roam/deft to
+  vertico/consult/corfu/denote).
+- If it does not offer to remove a package you expected, that package may still
+  be listed in =package-selected-packages=; open your custom file and remove it
+  from that list, then re-run.
+- =M-x package-delete= removes a single package by name if you want finer control.
+- =list-packages= shows everything installed; press =? =/=U= there to browse and
+  mark upgrades.
+
+** Troubleshooting: "Not found" / 404 when installing packages
+
+If installing a new package fails with something like:
+
+: Failed to install cape: https://melpa.org/packages/cape-20260311.1654.tar: Not found
+
+...your cached archive metadata is *stale*.  MELPA continuously rebuilds packages
+and deletes old versions, so a cached =package-archive-contents= can reference a
+version that no longer exists on the server (hence the 404).  This config only
+refreshes the cache when it is completely empty
+(=(unless package-archive-contents (package-refresh-contents))=), so a
+stale-but-present cache never updates on its own.
+
+Fix: refresh the metadata, then re-install / restart:
+
+: M-x package-refresh-contents
+
+A void-function error like =Symbol's function definition is void: global-corfu-mode=
+is usually the *same* problem -- the package (here =corfu=) failed to install
+because of the 404, so its functions were never defined.  Refresh and reload.
+
+It is good practice to run =package-refresh-contents= right before adding new
+packages to this file.
+
 * Custom Files
 
 Load custom emacs lisp files here.
@@ -98,6 +154,22 @@ Load custom emacs lisp files here.
   (add-to-list 'load-path (directory-file-name (concat jem/custom-emacs "/lisp")))
   (setq bookmark-default-file (concat jem/custom-emacs "/bookmarks"))
   (setq custom-theme-directory (expand-file-name "themes" jem/custom-emacs))
+#+end_src
+
+* macOS shell PATH
+
+GUI Emacs launched from Finder/Dock on macOS does *not* inherit the =PATH= (and
+other env vars) from your shell, so tools like =sbcl=, =gopls=, =rg=, =fzf= and
+language servers won't be found even though they work in a terminal.
+[[https://github.com/purcell/exec-path-from-shell][exec-path-from-shell]] copies your shell environment into Emacs so =executable-find=,
+=lsp-mode= and =compile= all behave the same as in a terminal.  Gated to macOS
+window systems so it is a no-op on Linux/Windows and when running =emacs -nw=.
+
+#+begin_src emacs-lisp
+  (use-package exec-path-from-shell
+    :if (memq window-system '(mac ns))
+    :config
+    (exec-path-from-shell-initialize))
 #+end_src
 
 * Basic Configuration
@@ -130,9 +202,13 @@ This section contains genral configuration of emacs settings.  UI related change
      ;; fast, or hold down control to move 3x as fast. Perfect for trackpads.
      mouse-wheel-scroll-amount '(2 ((shift) . 4) ((control) . 6)))
 
-    ;; Uses system trash rather than deleting forever
-    (setq trash-directory (concat jeff/home "/.local/share/Trash/files"))
+    ;; Uses system trash rather than deleting forever.
+    ;; On macOS (and Windows) Emacs has a native `system-move-file-to-trash', so
+    ;; we leave `trash-directory' nil and let it move files to ~/.Trash.  Only on
+    ;; Linux do we point at the freedesktop XDG trash location.
     (setq delete-by-moving-to-trash t)
+    (when (eq system-type 'gnu/linux)
+      (setq trash-directory (concat jeff/home "/.local/share/Trash/files")))
 
     ;; BACKUPS/LOCKFILES --------
     ;; Don't generate backups or lockfiles by adding the following 2 lines.
@@ -163,8 +239,16 @@ This section contains genral configuration of emacs settings.  UI related change
   (prefer-coding-system 'utf-8)            ; pretty
   (setq locale-coding-system 'utf-8)       ; please
 
-  (setq browse-url-firefox-program "/usr/bin/firefox")
-  (setq browse-url-brave-program "/usr/bin/brave")
+  ;; Point the browser programs at the right binary per OS.  The leader bindings
+  ;; "abf"/"abc" call browse-url-firefox / browse-url-brave.  On macOS the real
+  ;; executables live inside the .app bundles under /Applications.
+  (pcase system-type
+    ('darwin
+     (setq browse-url-firefox-program "/Applications/Firefox.app/Contents/MacOS/firefox")
+     (setq browse-url-brave-program "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"))
+    (_
+     (setq browse-url-firefox-program "/usr/bin/firefox")
+     (setq browse-url-brave-program "/usr/bin/brave")))
 
   (setq blink-cursor-interval 0.6)
 
@@ -343,7 +427,7 @@ This configuration uses [[https://evil.readthedocs.io/en/latest/index.html][evil
       "pt" 'projectile-run-shell
       ;; Toggles
       "t"  '(:ignore t :which-key "toggles")
-      "tt" '(counsel-load-theme :which-key "choose theme")
+      "tt" '(consult-theme :which-key "choose theme")
       ;; Window operations
       "w"   '(:ignore t :which-key "window")
       "wm"  'maximize-window
@@ -440,8 +524,8 @@ Org mode comma leader key bindings.
   "c" '(org-capture :which-key "org-capture")
   "s" '(org-schedule :which-key "schedule")
   "d" '(org-deadline :which-key "deadline")
-  "g" '(counsel-org-goto :which-key "goto heading")
-  "t" '(counsel-org-tag :which-key "set tags")
+  "g" '(consult-org-heading :which-key "goto heading")
+  "t" '(org-set-tags-command :which-key "set tags")
   "p" '(org-set-property :which-key "set property")
   "e" '(org-export-dispatch :which-key "export org")
   "B" '(org-toggle-narrow-to-subtree :which-key "toggle narrow to subtree")
@@ -502,7 +586,7 @@ Org mode comma leader key bindings.
 
 ** Color Theme
 
-[[https://github.com/hlissner/emacs-doom-themes][doom-themes]] is a great set of themes with a lot of variety and support for many different Emacs modes.  Taking a look at the [[https://github.com/hlissner/emacs-doom-themes/tree/screenshots][screenshots]] might help you decide which one you like best.  You can also run =M-x counsel-load-theme= to choose between them easily.
+[[https://github.com/hlissner/emacs-doom-themes][doom-themes]] is a great set of themes with a lot of variety and support for many different Emacs modes.  Taking a look at the [[https://github.com/hlissner/emacs-doom-themes/tree/screenshots][screenshots]] might help you decide which one you like best.  You can also run =M-x consult-theme= to choose between them easily (with live preview).
 
 #+begin_src emacs-lisp
 
@@ -527,11 +611,27 @@ Org mode comma leader key bindings.
 
 [[https://github.com/seagle0128/doom-modeline][doom-modeline]] is a very attractive and rich (yet still minimal) mode line configuration for Emacs.  The default configuration is quite good but you can check out the [[https://github.com/seagle0128/doom-modeline#customize][configuration options]] for more things you can enable or disable.
 
-*NOTE:* The first time you load your configuration on a new machine, you'll need to run `M-x all-the-icons-install-fonts` so that mode line icons display correctly.
+*NOTE:* The first time you load your configuration on a new machine, run *both*
+icon-font installers so that all icons render (otherwise you'll see empty
+boxes/tofu):
+
+- =M-x nerd-icons-install-fonts= -- modern =doom-modeline= (and =nerd-icons=) use
+  the *Symbols Nerd Font Mono* family (=NFM.ttf=); the modeline glyphs come from
+  here.
+- =M-x all-the-icons-install-fonts= -- =all-the-icons= (used by the dashboard,
+  =all-the-icons-dired=, and buffer-name icons) ships its own separate font
+  files.
+
+On macOS these install into =~/Library/Fonts/=; *restart Emacs* afterwards so it
+picks up the newly installed fonts (a daemon must be killed and restarted).
 
 #+begin_src emacs-lisp
 
 (use-package all-the-icons)
+
+;; Icon set used by doom-modeline (and available to dashboard/dired).  Remember
+;; to run `M-x nerd-icons-install-fonts' once per machine (see note above).
+(use-package nerd-icons)
 
 (use-package doom-modeline
   :init (doom-modeline-mode 1)
@@ -553,44 +653,77 @@ Org mode comma leader key bindings.
 
 #+end_src
 
-** Ivy and Counsel
+** Minibuffer Completion (Vertico, Marginalia, Consult, Orderless, Embark)
 
-[[https://oremacs.com/swiper/][Ivy]] is an excellent completion framework for Emacs.  It provides a minimal yet powerful selection menu that appears when you open files, switch buffers, and for many other tasks in Emacs.  Counsel is a customized set of commands to replace `find-file` with `counsel-find-file`, etc which provide useful commands for each of the default completion commands.
-
-[[https://github.com/Yevgnen/ivy-rich][ivy-rich]] adds extra columns to a few of the Counsel commands to provide more information about each item.
+This replaces the old Ivy/Counsel/Swiper stack with the modern, modular
+completion setup:
+- [[https://github.com/minad/vertico][Vertico]] -- a vertical completion UI in the minibuffer.
+- [[https://github.com/oantolin/orderless][Orderless]] -- flexible, space-separated fuzzy matching.
+- [[https://github.com/minad/marginalia][Marginalia]] -- rich annotations next to completion candidates (the modern
+  replacement for =ivy-rich=).
+- [[https://github.com/minad/consult][Consult]] -- practical search & navigation commands (=consult-line= replaces
+  =swiper=, =consult-buffer= replaces =counsel-switch-buffer=, etc).
+- [[https://github.com/oantolin/embark][Embark]] -- context-sensitive actions on the thing at point / in the minibuffer.
+- =savehist= persists minibuffer history so frequently used candidates sort first.
 
 #+begin_src emacs-lisp
 
-  (use-package ivy
-    :diminish
-    :bind (("C-s" . swiper)
-           :map ivy-minibuffer-map
-           ("TAB" . ivy-alt-done)
-           ("C-l" . ivy-alt-done)
-           ("C-j" . ivy-next-line)
-           ("C-k" . ivy-previous-line)
-           :map ivy-switch-buffer-map
-           ("C-k" . ivy-previous-line)
-           ("C-l" . ivy-done)
-           ("C-d" . ivy-switch-buffer-kill)
-           :map ivy-reverse-i-search-map
-           ("C-k" . ivy-previous-line)
-           ("C-d" . ivy-reverse-i-search-kill))
-    :config
-    (ivy-mode 1))
-
-  (use-package ivy-rich
+  (use-package vertico
     :init
-    (ivy-rich-mode 1))
-
-  (use-package counsel
-    :bind (("C-M-j" . 'counsel-switch-buffer)
-           :map minibuffer-local-map
-           ("C-r" . 'counsel-minibuffer-history))
+    (vertico-mode)
     :custom
-    (counsel-linux-app-format-function #'counsel-linux-app-format-function-name-only)
+    (vertico-cycle t)
+    :bind (:map vertico-map
+           ;; Keep the muscle memory from the old ivy C-j/C-k bindings.
+           ("C-j" . vertico-next)
+           ("C-k" . vertico-previous)))
+
+  ;; Persist history over restarts; vertico sorts by history position.
+  (use-package savehist
+    :ensure nil
+    :init
+    (savehist-mode))
+
+  (use-package orderless
+    :custom
+    (completion-styles '(orderless basic))
+    (completion-category-defaults nil)
+    (completion-category-overrides '((file (styles basic partial-completion)))))
+
+  (use-package marginalia
+    :after vertico
+    :init
+    (marginalia-mode))
+
+  (use-package consult
+    :bind (("C-s"     . consult-line)          ;; was swiper
+           ("C-M-j"   . consult-buffer)        ;; was counsel-switch-buffer
+           ("C-x b"   . consult-buffer)
+           ("C-x 4 b" . consult-buffer-other-window)
+           ("C-x r b" . consult-bookmark)
+           ("M-y"     . consult-yank-pop)
+           ("M-g g"   . consult-goto-line)
+           ("M-g M-g" . consult-goto-line)
+           ("M-g i"   . consult-imenu)
+           ("M-g o"   . consult-outline)
+           ("M-s r"   . consult-ripgrep)
+           ("M-s f"   . consult-find)
+           :map minibuffer-local-map
+           ("C-r"     . consult-history))      ;; was counsel-minibuffer-history
+    :custom
+    (consult-narrow-key "<")
     :config
-    (counsel-mode 1))
+    ;; Use projectile's notion of the current project for project-scoped commands.
+    (setq consult-project-function (lambda (_) (projectile-project-root))))
+
+  (use-package embark
+    :bind (("C-." . embark-act)
+           ("M-." . embark-dwim)
+           ([remap describe-bindings] . embark-bindings)))
+
+  (use-package embark-consult
+    :after (embark consult)
+    :hook (embark-collect-mode . consult-preview-at-point-mode))
 
 #+end_src
 
@@ -601,14 +734,12 @@ Org mode comma leader key bindings.
 #+begin_src emacs-lisp
 
   (use-package helpful
-    :custom
-    (counsel-describe-function-function #'helpful-callable)
-    (counsel-describe-variable-function #'helpful-variable)
     :bind
-    ([remap describe-function] . counsel-describe-function)
-    ([remap describe-command] . helpful-command)
-    ([remap describe-variable] . counsel-describe-variable)
-    ([remap describe-key] . helpful-key))
+    ([remap describe-function] . helpful-callable)
+    ([remap describe-command]  . helpful-command)
+    ([remap describe-variable] . helpful-variable)
+    ([remap describe-key]      . helpful-key)
+    ([remap describe-symbol]   . helpful-symbol))
 
 #+end_src
 
@@ -901,12 +1032,17 @@ This snippet adds a hook to =org-mode= buffers so that =efs/org-babel-tangle-con
 #+end_src
 
 * Org Web Tools
-#+begin_src emacs_lisp
+#+begin_src emacs-lisp
 (use-package org-web-tools)
 #+end_src
-* Org Roam
+* Org Roam (deprecated -- superseded by [[Denote]])
+This configuration has migrated note-taking to [[https://protesilaos.com/emacs/denote][Denote]] (see the
+[[Denote]] section below).  The Org Roam config is kept here but *not tangled*
+(=:tangle no=) so you can still migrate your existing Roam notes before deleting
+it.  Note that this is the org-roam *v1* API (=org-roam-mode=,
+=org-roam-capture--get-point=, =:head=) which no longer works with org-roam v2.
 ** Configuration
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :tangle no
 (use-package org-roam
   :hook
   (after-init . org-roam-mode)
@@ -981,13 +1117,74 @@ This snippet adds a hook to =org-mode= buffers so that =efs/org-babel-tangle-con
          (("C-c n i" . org-roam-insert))
          (("C-c n I" . org-roam-insert-immediate))))
 #+end_src
-* Deft
-#+begin_src emacs-lisp
+* Deft (deprecated -- superseded by [[Consult Notes]])
+Deft is kept but *not tangled* (=:tangle no=); its role (quickly browsing/searching
+a directory of notes) is now filled by =consult-notes= in the [[Consult Notes]] section.
+#+begin_src emacs-lisp :tangle no
 (use-package deft
   :commands (deft)
   :config (setq deft-directory "/mnt/Data2/Documents/Roam"
                 deft-recursive t
                 deft-extensions '("md" "org")))
+#+end_src
+
+* Denote
+
+[[https://protesilaos.com/emacs/denote][Denote]] is a simple, file-based note-taking package.  Each note is a plain
+file whose name encodes an identifier, title and keywords (tags), e.g.
+=20240115T091530--my-note-title__emacs_project.org=.  There is no database to
+maintain (unlike Org Roam), links are just Org/Markdown links, and everything
+works with ordinary tools like Dired, grep and =consult-notes= (below).
+
+Notes are stored in =denote-directory=, which we point at =jeff/kb= (defined in
+=private.el=) so it follows you across machines.
+
+#+begin_src emacs-lisp
+  (use-package denote
+    :custom
+    (denote-directory (expand-file-name jeff/kb))
+    (denote-known-keywords '("emacs" "project" "journal" "reference" "idea"))
+    (denote-file-type 'org)          ;; new notes default to Org
+    (denote-prompts '(title keywords))
+    (denote-date-prompt-use-org-read-date t)
+    :hook
+    ;; Fontify Denote file names in Dired buffers.
+    (dired-mode . denote-dired-mode)
+    :bind
+    (("C-c n n" . denote)                 ;; create a new note
+     ("C-c n c" . denote-region)          ;; note from the active region
+     ("C-c n N" . denote-type)            ;; new note, choosing the file type
+     ("C-c n r" . denote-rename-file)
+     ("C-c n R" . denote-rename-file-using-front-matter)
+     ("C-c n l" . denote-link)            ;; insert a link to another note
+     ("C-c n L" . denote-add-links)
+     ("C-c n b" . denote-backlinks)
+     ("C-c n d" . denote-dired)           ;; open the denote directory in Dired
+     ("C-c n g" . denote-grep)))          ;; grep across all notes
+
+  ;; Convenient Denote commands from within Org buffers (dynamic block,
+  ;; link that also creates the target note if needed, etc).
+  (use-package denote-org
+    :after (denote org)
+    :bind (:map org-mode-map
+           ("C-c n i" . denote-org-link-to-heading)))
+#+end_src
+
+* Consult Notes
+
+[[https://github.com/mclear-tools/consult-notes][consult-notes]] gives you a =consult= interface (with =marginalia= annotations and
+live preview) for finding and searching your notes.  We wire it up to Denote so
+=consult-notes= lists your Denote files and =consult-notes-search-in-all-notes=
+runs a ripgrep across all of them.
+
+#+begin_src emacs-lisp
+  (use-package consult-notes
+    :after (consult denote)
+    :bind
+    (("C-c n f" . consult-notes)                       ;; find a note
+     ("C-c n s" . consult-notes-search-in-all-notes))  ;; ripgrep all notes
+    :config
+    (consult-notes-denote-mode))
 #+end_src
 * Development
 ** Compile
@@ -1038,6 +1235,9 @@ The =which-key= integration adds helpful descriptions of the various keys so you
     :hook (lsp-mode . efs/lsp-mode-setup)
     :init
     (setq lsp-keymap-prefix "C-c l")  ;; Or 'C-l', 's-l'
+    ;; We use Corfu (capf) for completion, so tell lsp-mode not to try to
+    ;; configure company.  lsp-mode exposes candidates via completion-at-point.
+    (setq lsp-completion-provider :none)
     :config
     (lsp-enable-which-key-integration t))
 
@@ -1075,18 +1275,26 @@ This package is built on the [[https://github.com/Alexander-Miller/treemacs][tre
 
 #+end_src
 
-**** lsp-ivy
+**** consult-lsp
 
-[[https://github.com/emacs-lsp/lsp-ivy][lsp-ivy]] integrates Ivy with =lsp-mode= to make it easy to search for things by name in your code.  When you run these commands, a prompt will appear in the minibuffer allowing you to type part of the name of a symbol in your code.  Results will be populated in the minibuffer so that you can find what you're looking for and jump to that location in the code upon selecting the result.
+[[https://github.com/gagbo/consult-lsp][consult-lsp]] integrates Consult with =lsp-mode= to make it easy to search for
+things by name in your code (the Vertico-stack replacement for =lsp-ivy=).  When
+you run these commands, a prompt appears in the minibuffer allowing you to type
+part of the name of a symbol; results are populated with live preview so you can
+jump to that location upon selecting a result.
 
 Try these commands with =M-x=:
 
-- =lsp-ivy-workspace-symbol= - Search for a symbol name in the current project workspace
-- =lsp-ivy-global-workspace-symbol= - Search for a symbol name in all active project workspaces
+- =consult-lsp-symbols= - Search for a symbol name in the current workspace
+- =consult-lsp-file-symbols= - Search for a symbol in the current file
+- =consult-lsp-diagnostics= - Browse diagnostics (errors/warnings) with preview
 
 #+begin_src emacs-lisp
 
-  (use-package lsp-ivy)
+  (use-package consult-lsp
+    :after lsp-mode
+    :bind (:map lsp-mode-map
+           ([remap xref-find-apropos] . consult-lsp-symbols)))
 
 #+end_src
 
@@ -1226,7 +1434,10 @@ You can use the pyvenv package to use =virtualenv= environments in Emacs.  The =
 
   (use-package sly
     :config
-    (setq inferior-lisp-program "/usr/bin/sbcl"))
+    ;; Find sbcl on PATH wherever it lives (Homebrew puts it at
+    ;; /opt/homebrew/bin on Apple Silicon, /usr/local/bin on Intel, /usr/bin on
+    ;; most Linux distros), falling back to the Linux default if not on PATH.
+    (setq inferior-lisp-program (or (executable-find "sbcl") "/usr/bin/sbcl")))
 
 #+end_src
 *** Golang
@@ -1240,8 +1451,7 @@ The configuration requires that the gopls language server is installed on the sy
 #+begin_src emacs-lisp
     (use-package go-mode
     :ensure t
-    :hook ((go-mode . lsp-deferred)
-           (go-mode . company-mode))
+    :hook (go-mode . lsp-deferred)
     :bind (:map go-mode-map
                 ("C-c 6" . gofmt))
     :config
@@ -1258,42 +1468,64 @@ The configuration requires that the gopls language server is installed on the sy
     (add-to-list 'exec-path "~/go/bin")
     (setq gofmt-command "goimports"))
 #+end_src
-** Company Mode
+** In-buffer Completion (Corfu + Cape)
 
-[[http://company-mode.github.io/][Company Mode]] provides a nicer in-buffer completion interface than =completion-at-point= which is more reminiscent of what you would expect from an IDE.  We add a simple configuration to make the keybindings a little more useful (=TAB= now completes the selection and initiates completion at the current location if needed).
+[[https://github.com/minad/corfu][Corfu]] provides a small popup for in-buffer completion at point -- the modern,
+lightweight companion to the Vertico minibuffer stack (replacing =company=).  It
+uses Emacs' built-in =completion-at-point-functions= (capf), so it works with
+=lsp-mode= (we set =lsp-completion-provider= to =:none= above), Elisp, files, etc.
 
-We also use [[https://github.com/sebastiencs/company-box][company-box]] to further enhance the look of the completions with icons and better overall presentation.
+[[https://github.com/minad/cape][Cape]] supplies extra completion-at-point backends (files, dabbrev, keywords) so
+you get useful completions even in buffers without an LSP server.
 
 #+begin_src emacs-lisp
 
-(use-package company
-  :after lsp-mode
-  :hook (lsp-mode . company-mode)
-  :bind (:map company-active-map
-         ("C-j" . company-select-next)
-         ("C-k" . company-select-previous)
-         ("<tab>" . company-complete-selection))
-        (:map lsp-mode-map
-         ("<tab>" . company-indent-or-complete-common))
-  :custom
-  (company-minimum-prefix-length 1)
-  (company-tooltip-limit 14)
-  (company-tooltip-align-annotations t)
-  (company-require-match 'never)
-  (company-global-modes '(not erc-mode message-mode help-mode gud-mode))
-  (company-frontends
-   '(company-pseudo-tooltip-frontend  ; always show candidates in overlay tooltip
-    company-echo-metadata-frontend))  ; show selected candidate docs in echo area
-  (company-backends '(company-capf company-files company-keywords))
-  (company-auto-complete nil)
-  (company-auto-complete-chars nil)
-  (company-dabbrev-other-buffers nil)
-  (company-dabbrev-ignore-case nil)
-  (company-dabbrev-downcase nil)
-  (company-idle-delay 0.0))
+  (use-package corfu
+    :init
+    (global-corfu-mode)
+    :custom
+    (corfu-cycle t)                ;; cycle through candidates
+    (corfu-auto t)                 ;; pop up automatically...
+    (corfu-auto-prefix 2)          ;; ...after 2 characters
+    (corfu-auto-delay 0.0)
+    (corfu-quit-no-match 'separator)
+    (corfu-preview-current nil)    ;; don't insert the preview into the buffer
+    :bind (:map corfu-map
+           ;; Match the old company C-j/C-k muscle memory.
+           ("C-j"   . corfu-next)
+           ("C-k"   . corfu-previous)
+           ("<tab>" . corfu-insert)
+           ("TAB"   . corfu-insert)))
 
-(use-package company-box
-  :hook (company-mode . company-box-mode))
+  ;; Persist last selected candidate across sessions (uses savehist).
+  (use-package corfu-history
+    :ensure nil
+    :after (corfu savehist)
+    :init
+    (corfu-history-mode 1)
+    (add-to-list 'savehist-additional-variables 'corfu-history))
+
+  (use-package cape
+    :init
+    ;; Add a few generally-useful completion sources.  Order matters: earlier
+    ;; entries have higher priority.
+    (add-to-list 'completion-at-point-functions #'cape-file)
+    (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+    (add-to-list 'completion-at-point-functions #'cape-keyword))
+
+  ;; Icons in the Corfu popup.  You already install Nerd Fonts for the modeline,
+  ;; so nerd-icons works here too -- run `M-x nerd-icons-install-fonts' once if
+  ;; the glyphs show as tofu/boxes.
+  (use-package nerd-icons-corfu
+    :after corfu
+    :config
+    (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
+
+  ;; OPTIONAL: Corfu's child-frame popup only works in GUI Emacs.  If you use
+  ;; Emacs in a terminal, install `corfu-terminal' and enable it there:
+  ;; (unless (display-graphic-p)
+  ;;   (use-package corfu-terminal
+  ;;     :config (corfu-terminal-mode +1)))
 
 #+end_src
 
@@ -1306,7 +1538,8 @@ We also use [[https://github.com/sebastiencs/company-box][company-box]] to furth
   (use-package projectile
     :diminish projectile-mode
     :config (projectile-mode)
-    :custom ((projectile-completion-system 'ivy))
+    ;; Let the default (now Vertico) completing-read handle projectile prompts.
+    :custom ((projectile-completion-system 'default))
     :bind-keymap
     ("C-c p" . projectile-command-map)
     :init
@@ -1315,8 +1548,13 @@ We also use [[https://github.com/sebastiencs/company-box][company-box]] to furth
       (setq projectile-project-search-path '("~/dev")))
     (setq projectile-switch-project-action #'projectile-dired))
 
-  (use-package counsel-projectile
-    :config (counsel-projectile-mode))
+  ;; Consult-powered project commands (the Vertico-stack replacement for
+  ;; counsel-projectile).  `consult-projectile' is a single entry point that
+  ;; switches project / finds file / buffer with live preview.
+  (use-package consult-projectile
+    :after projectile
+    :bind (:map projectile-command-map
+           ("SPC" . consult-projectile)))
 
 #+end_src
 
@@ -1478,7 +1716,7 @@ Make sure that you have the [[https://github.com/akermu/emacs-libvterm/#requirem
 - =C-c C-p= / =C-c C-n= - go back and forward in the buffer's prompts (also =[[= and =]]= with evil-mode)
 - =M-p= / =M-n= - go back and forward in the input history
 - =C-c C-u= - delete the current input string backwards up to the cursor
-- =counsel-shell-history= - A searchable history of commands typed into the shell
+- =consult-history= - A searchable history of commands typed into the shell
 
 One advantage of =shell-mode= on Windows is that it's the only way to run =cmd.exe=, PowerShell, Git Bash, etc from within Emacs.  Here's an example of how you would set up =shell-mode= to run PowerShell on Windows:
 
@@ -1501,7 +1739,7 @@ The downsides to Eshell are that it can be harder to configure than other packag
 - =C-c C-p= / =C-c C-n= - go back and forward in the buffer's prompts (also =[[= and =]]= with evil-mode)
 - =M-p= / =M-n= - go back and forward in the input history
 - =C-c C-u= - delete the current input string backwards up to the cursor
-- =counsel-esh-history= - A searchable history of commands typed into Eshell
+- =consult-history= - A searchable history of commands typed into Eshell (bound to =C-r=)
 
 We will be covering Eshell more in future videos highlighting other things you can do with it.
 
@@ -1519,7 +1757,7 @@ For more thoughts on Eshell, check out these articles by Pierre Neidhardt:
     (add-to-list 'eshell-output-filter-functions 'eshell-truncate-buffer)
 
     ;; Bind some useful keys for evil-mode
-    (evil-define-key '(normal insert visual) eshell-mode-map (kbd "C-r") 'counsel-esh-history)
+    (evil-define-key '(normal insert visual) eshell-mode-map (kbd "C-r") 'consult-history)
     (evil-define-key '(normal insert visual) eshell-mode-map (kbd "<home>") 'eshell-bol)
     (evil-normalize-keymaps)
 
@@ -1733,7 +1971,7 @@ Automatically save the last position in a file so can return to last spot when r
     :config
     (progn
       (elfeed-org)
-      (setq rmh-elfeed-org-files (list "/mnt/Data2/Documents/kb/emacs/elfeed.org"))))
+      (setq rmh-elfeed-org-files (list (concat jeff/kb "emacs/elfeed.org")))))
 
   (define-key global-map (kbd "C-c e") #'elfeed)
 #+end_src
@@ -1764,7 +2002,7 @@ This is an example of configuring another non-Emacs application using org-mode. 
 	:ensure t
 	:init
 	(progn
-	  (setq dashboard-items '((recents .7)
+	  (setq dashboard-items '((recents . 7)
 				  (projects . 3)))
 	  (setq dashboard-show-shortcuts t)
 	  (setq dashboard-center-content nil)
@@ -1779,25 +2017,33 @@ This is an example of configuring another non-Emacs application using org-mode. 
 
 * Publish
 Org-publish
+The =imagineallthings.com= repo lives in a different place on each machine, so
+the base directory is chosen by =system-type= below (=jeff/dev= is only defined on
+macOS in =private.el=, hence it is only referenced in the darwin branch).  Adjust
+=iat-base= if you check the repo out somewhere else.
 #+begin_src emacs-lisp
   (setq org-publish-use-timestamps-flag nil)
   (setq org-export-with-broken-links t)
-  (setq org-publish-project-alist
-      '(("imagineallthings.com"
-         :base-directory "/mnt/Data2/dev/GitHub/imagineallthings.com/"
-         :base-extension "org"
-         :publishing-directory "/mnt/Data2/dev/GitHub/imagineallthings.com/html/"
-         :recursive t
-         :exclude "org-html-themes/.*"
-         :publishing-function org-html-publish-to-html
-         :headline-levels 4
-         :auto-preamble t)
-        ("images"
-         :base-directory "/mnt/Data2/dev/GitHub/imagineallthings.com/blog/img/"
-         :base-extension "png\\|jpg\\|jpeg"
-         :publishing-directory "/mnt/Data2/dev/GitHub/imagineallthings.com/html/blog/img/"
-         :publishing-function org-publish-attachment)
-        ("website" :components("imagineallthings.com" "images"))))
+  (let* ((iat-base (pcase system-type
+                     ('darwin (concat jeff/dev "imagineallthings.com/"))
+                     (_       "/mnt/Data2/dev/GitHub/imagineallthings.com/")))
+         (iat-html (concat iat-base "html/")))
+    (setq org-publish-project-alist
+        `(("imagineallthings.com"
+           :base-directory ,iat-base
+           :base-extension "org"
+           :publishing-directory ,iat-html
+           :recursive t
+           :exclude "org-html-themes/.*"
+           :publishing-function org-html-publish-to-html
+           :headline-levels 4
+           :auto-preamble t)
+          ("images"
+           :base-directory ,(concat iat-base "blog/img/")
+           :base-extension "png\\|jpg\\|jpeg"
+           :publishing-directory ,(concat iat-html "blog/img/")
+           :publishing-function org-publish-attachment)
+          ("website" :components ("imagineallthings.com" "images")))))
 #+end_src
 
 * Presentation
@@ -1837,9 +2083,28 @@ After starting the presentation, press the 's' key to open the presenting window
 [[https://revealjs.com/][Revealjs]]
 
 * Latex
+Xenops gives nice inline LaTeX preview, but it is *fragile*: it adds
+=xenops-mode= to =org-mode-hook=, and on entry it runs a "doctor" self-check.
+That doctor has a bug -- when it detects *any* problem it evaluates
+=(error problems)= where =problems= is actually the value returned by
+=display-buffer= (a window object), producing =wrong-type-argument stringp
+#<window ...>=.  Because this error is signalled from inside =org-mode-hook=, it
+aborts the remaining hooks (=org-bullets-mode=, =efs/org-mode-visual-fill=,
+=efs/org-mode-setup=), so every org buffer opens as *unstyled plain text* (no
+bullets, no faces, no code highlighting).
+
+On macOS this bites easily: GUI/daemon Emacs launched from the Dock may not find
+=latex=/=dvisvgm= on =PATH= (see [[macOS shell PATH]]), and the doctor then trips the
+bug.  Rather than fight it, we restrict xenops to Linux (where the toolchain and
+this workflow are set up) and use Emacs' *built-in* =org-latex-preview= on macOS
+instead (see [[Built-in Org LaTeX preview]] below), which is on-demand and cannot
+break org styling.
 #+begin_src emacs-lisp
-  ;; best latex preview functionality
-    (if (not msystem)
+  ;; Xenops only on Linux -- it is too fragile on macOS GUI/daemon (see note
+  ;; above); macOS uses the built-in org-latex-preview section below instead.
+    (if (and (eq system-type 'gnu/linux)
+             (executable-find "latex")
+             (executable-find "dvisvgm"))
 	(use-package xenops
 	  :config
 	  (setq xenops-reveal-on-entry t)
@@ -1854,6 +2119,35 @@ After starting the presentation, press the 's' key to open the presenting window
 		  '(:delimiters
 		    ("^[ 	]*\\\\begin{\\(align\\|equation\\|gather\\)\\*?}" "^[ 	]*\\\\end{\\(align\\|equation\\|gather\\)\\*?}")
 		    ("^[ 	]*\\\\\\[" "^[ 	]*\\\\\\]")))))
+#+end_src
+
+** Built-in Org LaTeX preview
+
+On macOS (where xenops is disabled above) we use org's own built-in LaTeX
+preview.  It renders fragments to images with =dvisvgm= (crisp/scalable; the GUI
+=Emacs.app= build supports SVG) and is invoked *on demand*, so it never runs in
+=org-mode-hook= and cannot break org styling.
+
+Requires a LaTeX toolchain -- on this Mac that's =basictex= + =dvisvgm=/=dvipng=
+(=brew install --cask basictex= then =brew install dvisvgm=; =dvipng= ships with
+basictex).  Because GUI Emacs must be able to find these on =PATH=, this relies
+on [[macOS shell PATH]] (=exec-path-from-shell=).
+
+*Usage:*
+- =C-c C-x C-l= (=org-latex-preview=) -- toggle preview of the fragment at point;
+  with point outside a fragment it previews the whole section.  =C-u C-c C-x C-l=
+  clears previews.
+- Add =#+STARTUP: latexpreview= to a file's header to auto-preview on open, or
+  set =org-startup-with-latex-preview= to =t= if you want that everywhere.
+
+#+begin_src emacs-lisp
+  (when (eq system-type 'darwin)
+    (with-eval-after-load 'org
+      ;; dvisvgm -> SVG (needs dvisvgm + an SVG-capable Emacs, which Emacs.app is).
+      ;; Switch to 'dvipng if you prefer PNG or hit SVG issues.
+      (setq org-preview-latex-default-process 'dvisvgm)
+      ;; Scale preview images up to roughly match the buffer font.
+      (plist-put org-format-latex-options :scale 1.5)))
 #+end_src
 
 * EDIFF
