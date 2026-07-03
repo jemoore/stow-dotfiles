@@ -49,3 +49,5 @@ build/
 lbuild/
 tags
 .cache/
+
+**/.claude/settings.local.json
