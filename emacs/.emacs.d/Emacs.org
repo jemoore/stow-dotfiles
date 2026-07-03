@@ -77,9 +77,14 @@ Emacs has a built in package manager but it doesn't make it easy to automaticall
   ;; Initialize package sources
   (require 'package)
 
+  ;; NonGNU ELPA is part of Emacs' default archive set; we include it here
+  ;; (this `setq' overrides the default) because some packages -- e.g. `popon',
+  ;; the dependency of `corfu-terminal' used for terminal completion popups --
+  ;; are only published there.
   (setq package-archives '(("melpa" . "https://melpa.org/packages/")
                            ("org" . "https://orgmode.org/elpa/")
-                           ("elpa" . "https://elpa.gnu.org/packages/")))
+                           ("elpa" . "https://elpa.gnu.org/packages/")
+                           ("nongnu" . "https://elpa.nongnu.org/nongnu/")))
 
   (package-initialize)
   (unless package-archive-contents
@@ -287,12 +292,17 @@ The menu bar can sometimes be helpful and can be turned back on with =(menu-bar-
 
   (setq inhibit-startup-message t)
 
-  (scroll-bar-mode -1)        ; Disable visible scrollbar
-  (tool-bar-mode -1)          ; Disable the toolbar
-  (tooltip-mode -1)           ; Disable tooltips
-  (set-fringe-mode 10)        ; Give some breathing room
+  ;; These frame-decoration toggles only exist in a graphical Emacs build.  In a
+  ;; terminal (=emacs -nw=) the functions are *void*, and an unguarded call
+  ;; signals `void-function' which aborts the loading of the *rest* of init.el
+  ;; (leaving you with a nearly vanilla Emacs).  Guard each with `fboundp' so the
+  ;; same init.el loads cleanly in both the terminal and a GUI window.
+  (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))   ; Disable visible scrollbar
+  (when (fboundp 'tool-bar-mode)   (tool-bar-mode -1))     ; Disable the toolbar
+  (when (fboundp 'tooltip-mode)    (tooltip-mode -1))      ; Disable tooltips
+  (when (fboundp 'set-fringe-mode) (set-fringe-mode 10))   ; Give some breathing room
 
-  (menu-bar-mode -1)            ; Disable the menu bar
+  (menu-bar-mode -1)            ; Disable the menu bar (works on ttys too)
 
   ;; Set up the visible bell
   (setq visible-bell t)
@@ -300,8 +310,9 @@ The menu bar can sometimes be helpful and can be turned back on with =(menu-bar-
   (column-number-mode)
   (global-display-line-numbers-mode t)
 
-  ;; Set frame transparency
-  (set-frame-parameter (selected-frame) 'alpha efs/frame-transparency)
+  ;; Set frame transparency (graphical frames only; a terminal has no alpha)
+  (when (display-graphic-p)
+    (set-frame-parameter (selected-frame) 'alpha efs/frame-transparency))
   (add-to-list 'default-frame-alist `(alpha . ,efs/frame-transparency))
   ;; (set-frame-parameter (selected-frame) 'fullscreen 'maximized)
   ;; (add-to-list 'default-frame-alist '(fullscreen . maximized))
@@ -323,16 +334,22 @@ These will need to be downloaded and installed if not already installed or chang
 
 #+begin_src emacs-lisp
   (defun efs/set-font-faces ()
-      (message "Setting faces!")
-      (set-face-attribute 'default nil :font "ShureTechMono Nerd Font" :height efs/default-font-size)
+      ;; Fonts only apply to graphical frames; a terminal frame draws with the
+      ;; host terminal's font.  Skip on ttys so this is a harmless no-op there
+      ;; (and, under a daemon, on any terminal client frame).
+      (when (display-graphic-p)
+        (message "Setting faces!")
+        (set-face-attribute 'default nil :font "ShureTechMono Nerd Font" :height efs/default-font-size)
 
-      ;; Set the fixed pitch face
-      (set-face-attribute 'fixed-pitch nil :font "ShureTechMono Nerd Font" :height efs/default-font-size)
+        ;; Set the fixed pitch face
+        (set-face-attribute 'fixed-pitch nil :font "ShureTechMono Nerd Font" :height efs/default-font-size)
 
-      ;; Set the variable pitch face
-      (set-face-attribute 'variable-pitch nil :font "ShureTechMono Nerd Font" :height efs/default-variable-font-size :weight 'regular))
+        ;; Set the variable pitch face
+        (set-face-attribute 'variable-pitch nil :font "ShureTechMono Nerd Font" :height efs/default-variable-font-size :weight 'regular)))
 
-  ;; If running as daemon need to reset fonts/modeline after creating new frame
+  ;; If running as daemon need to reset fonts/modeline after creating new frame.
+  ;; `efs/set-font-faces' now guards on `display-graphic-p' itself, so it does
+  ;; the right thing whether the new frame is a GUI or a terminal client.
   (if (daemonp)
       (add-hook 'after-make-frame-functions
                 (lambda (frame)
@@ -603,8 +620,12 @@ Org mode comma leader key bindings.
 
   (use-package ef-themes
     :ensure t
-    ;; :init (load-theme 'ef-elea-light))
-    :init (load-theme 'ef-dream))
+    ;; The `t' (NO-CONFIRM) is important: without it `load-theme' asks
+    ;; "Loading a theme can run Lisp code.  Really load? (y or n)" on startup.
+    ;; In a terminal (`emacs -nw') or daemon with no one to answer, that prompt
+    ;; blocks startup.  We trust our own theme, so load it without confirming.
+    ;; :init (load-theme 'ef-elea-light t))
+    :init (load-theme 'ef-dream t))
 #+end_src
 
 ** Better Modeline
@@ -1521,11 +1542,15 @@ you get useful completions even in buffers without an LSP server.
     :config
     (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 
-  ;; OPTIONAL: Corfu's child-frame popup only works in GUI Emacs.  If you use
-  ;; Emacs in a terminal, install `corfu-terminal' and enable it there:
-  ;; (unless (display-graphic-p)
-  ;;   (use-package corfu-terminal
-  ;;     :config (corfu-terminal-mode +1)))
+  ;; Corfu's completion popup is drawn with a child frame, which only works in
+  ;; GUI Emacs.  `corfu-terminal' re-implements the popup with overlays so it
+  ;; also works in a terminal (=emacs -nw=).  The mode only takes effect on
+  ;; terminal frames, so it is safe to enable unconditionally -- including under
+  ;; a daemon that serves both GUI and terminal clients.
+  (use-package corfu-terminal
+    :after corfu
+    :config
+    (corfu-terminal-mode +1))
 
 #+end_src
 
