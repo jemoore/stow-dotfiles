@@ -1,10 +1,8 @@
-# Usage
+# Dotfile Management
 
-The `--no-folding` flag instructs Stow to only create symbolic links for
-individual files (the "leaves") and not "fold" entire subtrees into a single
-directory symlink. This achieves the desired result of linking only individual
-files to your home directory while preserving the folder structure in your
-dotfiles repository.
+This repo uses `stow` to manage dot files on my Linux and Mac systems.
+The files stay in this repo and the `stow` command creates links in the
+home directory, in the appropriate location, back to files in this repo.
 
 ## Shell configuration layout
 
@@ -19,6 +17,12 @@ Shell config is split into three layers under `~/.local/shell.d/`:
 Adding a new file to `common/` picks it up in both shells with no rc edits.
 
 ## Stowing
+
+The `--no-folding` flag instructs Stow to only create symbolic links for
+individual files (the "leaves") and not "fold" entire subtrees into a single
+directory symlink. This achieves the desired result of linking only individual
+files to your home directory while preserving the folder structure in your
+dotfiles repository.
 
 Packages common to every machine:
 
