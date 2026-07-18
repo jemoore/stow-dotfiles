@@ -67,7 +67,7 @@
     {
         "key": "shift-j",
         "command": "editor.action.moveLinesDownAction",
-        "when": "vim.mode != 'Insert' && editorTextFocus"
+        "when": "vim.mode != 'Insert' && vim.mode != 'Normal' && editorTextFocus"
     },
     {
         "key": "shift-k",
@@ -133,6 +133,46 @@
         "key": "ctrl-n",
         "command": "editor.action.addSelectionToNextFindMatch",
         "when": "(vim.mode == 'Normal' || vim.mode == 'Visual') && (editorTextFocus || !inputFocus)"
+    },
+
+
+    {
+        "key": "space i d",
+        "command": "editor.action.insertSnippet",
+        "args": { "snippet": "$CURRENT_YEAR-$CURRENT_MONTH-$CURRENT_DATE" },
+        "when": "editorTextFocus"
+    },
+    {
+        "key": "space i t",
+        "command": "editor.action.insertSnippet",
+        "args": { "snippet": "$CURRENT_YEAR-$CURRENT_MONTH-$CURRENT_DATE $CURRENT_HOUR:$CURRENT_MINUTE:$CURRENT_SECOND" },
+        "when": "editorTextFocus"
+    },
+    {
+        "key": "space i D",
+        "command": "editor.action.insertSnippet",
+        "args": { "snippet": "$CURRENT_DAY_NAME, $CURRENT_MONTH_NAME $CURRENT_DATE, $CURRENT_YEAR" },
+        "when": "editorTextFocus"
+    },
+
+
+    {
+        "key": "space o t",
+        "command": "vscode.open",
+        "args": "file:///Users/jeff/todo.md",
+        "when": "isMac && vim.mode == 'Normal' && (editorTextFocus || !inputFocus)"
+    },
+    {
+        "key": "space o t",
+        "command": "vscode.open",
+        "args": "file:///home/jeff/todo.md",
+        "when": "isLinux && vim.mode == 'Normal' && (editorTextFocus || !inputFocus)"
+    },
+    {
+        "key": "space o t",
+        "command": "vscode.open",
+        "args": "file:///C:/Users/jeff/todo.md",
+        "when": "isWindows && vim.mode == 'Normal' && (editorTextFocus || !inputFocus)"
     },
 
 

@@ -1,5 +1,6 @@
 {
     "editor.fontSize": 18,
+    "editor.lineNumbers": "relative",
     "terminal.integrated.fontSize": 18,
     "editor.fontFamily": "'ShureTechMono Nerd Font Mono', 'Droid Sans Mono', 'monospace', monospace",
     "cmake.configureOnOpen": false,
