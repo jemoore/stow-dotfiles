@@ -1461,6 +1461,18 @@ You can use the pyvenv package to use =virtualenv= environments in Emacs.  The =
     (setq inferior-lisp-program (or (executable-find "sbcl") "/usr/bin/sbcl")))
 
 #+end_src
+
+=sly-quicklisp= adds [[https://www.quicklisp.org/][Quicklisp]] integration: =M-x sly-quickload= loads a system
+with tab-completion over everything Quicklisp knows about.  Requires Quicklisp
+to be installed in the Lisp image (run the standard install and
+=(ql:add-to-init-file)= so =~/.sbclrc= loads =~/quicklisp/setup.lisp=).
+
+#+begin_src emacs-lisp
+
+  (use-package sly-quicklisp
+    :after sly)
+
+#+end_src
 *** Golang
 The configuration requires that the gopls language server is installed on the system.
 #+begin_src sh :tangle no
@@ -1989,14 +2001,41 @@ Automatically save the last position in a file so can return to last spot when r
 ;;  )
 #+end_src
 * Elfeed
+Elfeed is an RSS/Atom feed reader.  Feed subscriptions are managed with
+=elfeed-org= in a plain org file rather than in this config, so feeds can be
+added or retagged without retangling.  The feed list lives at
+=jeff/kb= + =emacs/elfeed.org= (on the Mac:
+=~/dev/github.com/jemoore/KB/emacs/elfeed.org=).
+
+** Feed file format
+Everything under a top-level heading tagged =:elfeed:= is scanned:
+- A heading whose title is an org link — =[[https://xkcd.com/atom.xml][xkcd]]= —
+  subscribes to that feed URL with that title.
+- Org tags on a heading (e.g. =** News :news:=) are inherited by every feed
+  nested beneath it — that's how feeds get elfeed tags.  A plain heading with
+  no tags is just visual grouping.
+- *Careful:* a heading containing a bare link with no description
+  (=[[https://xkcd.com/]]=) is /also/ treated as a feed URL, so don't add site
+  homepages as child headings for reference.
+- A heading starting with =entry-title: <regexp>= tags matching entries
+  automatically.
+
+** Usage
+- =C-c e= (or =M-x elfeed=) opens the search buffer; the feed file is re-read
+  on every launch, so after editing it just run =M-x elfeed= again.
+- In the search buffer: =G= fetches all feeds, =RET= reads an entry, =b= opens
+  it in the browser, =r=/=u= mark read/unread, =+=/=-= add/remove a tag,
+  =s= edits the filter, =q= quits.
+- Filter examples: =@1-week-ago +unread=, =+news=, ==emacs= (by feed).
+  Tags from the org file's category headings are what make filtering useful.
+
 #+begin_src emacs-lisp
   (use-package elfeed :ensure t
-  :config (elfeed-set-max-connections 32))
+    :config (elfeed-set-max-connections 32))
   (use-package elfeed-org :ensure t
     :config
-    (progn
-      (elfeed-org)
-      (setq rmh-elfeed-org-files (list (concat jeff/kb "emacs/elfeed.org")))))
+    (setq rmh-elfeed-org-files (list (concat jeff/kb "emacs/elfeed.org")))
+    (elfeed-org))
 
   (define-key global-map (kbd "C-c e") #'elfeed)
 #+end_src
