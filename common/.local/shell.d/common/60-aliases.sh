@@ -31,3 +31,8 @@ alias oqwen='ollama run qwen3.5:9b --hidethinking'
 
 alias bupdate='brew update && brew upgrade'
 
+# tmux session management
+alias tmuxa='tmux attach -t'
+alias tmuxn='tmux new -s'
+alias tmuxk='tmux kill-session -t'
+

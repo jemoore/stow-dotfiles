@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+#
+# devclean - reclaim disk space by removing reproducible build/environment
+#            artifacts from the projects in a development folder.
+#
+# It scans each FIRST-LEVEL subdirectory of the target folder (each such
+# subdirectory is treated as one "project") and, within that project, removes:
+#
+#   * Python virtual environments   (dirs containing pyvenv.cfg, or named
+#                                     venv/.venv/env/.env with bin/activate)
+#   * Python caches                 (__pycache__, .pytest_cache, .mypy_cache,
+#                                     .ruff_cache, *.egg-info)
+#   * C/C++ CMake build trees       (dirs containing CMakeCache.txt)
+#   * Node dependency dirs          (node_modules)
+#
+# SAFETY
+#   - Dry-run by default. Nothing is deleted unless you pass --execute.
+#   - Only whole, positively-identified artifact directories are removed;
+#     source files are never targeted individually.
+#   - Any candidate directory that contains a *.db file (at any depth) is
+#     skipped and reported, so databases are never destroyed.
+#   - Symlinks are never followed or deleted.
+#
+# USAGE
+#   devclean [DIR] [options]
+#
+#     DIR                 Development root to scan (default: current directory)
+#     -x, --execute       Actually delete (default is a dry run / preview)
+#     -y, --yes           Skip the confirmation prompt when executing
+#     -h, --help          Show this help
+#
+# EXAMPLES
+#   cd ~/dev/github.com/jemoore && devclean            # preview only
+#   devclean ~/dev/github.com/jemoore --execute        # delete, with prompt
+#   devclean ~/dev/github.com/jemoore -x -y            # delete, no prompt
+
+set -euo pipefail
+
+ROOT="."
+EXECUTE=0
+ASSUME_YES=0
+
+die() { printf 'devclean: %s\n' "$1" >&2; exit 1; }
+
+usage() { sed -n '2,40p' "$0" | sed 's/^#\{0,1\} \{0,1\}//'; exit 0; }
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -x|--execute) EXECUTE=1 ;;
+        -y|--yes)     ASSUME_YES=1 ;;
+        -h|--help)    usage ;;
+        -*)           die "unknown option: $1 (try --help)" ;;
+        *)            ROOT="$1" ;;
+    esac
+    shift
+done
+
+[[ -d "$ROOT" ]] || die "not a directory: $ROOT"
+ROOT="$(cd "$ROOT" && pwd -P)"
+
+# Refuse to operate at obviously dangerous roots.
+case "$ROOT" in
+    / | /home | /Users | "$HOME") die "refusing to scan '$ROOT'; pick a projects folder" ;;
+esac
+
+# Portable directory size in human-readable form.
+dirsize() { du -sh "$1" 2>/dev/null | awk '{print $1}'; }
+
+# True if the directory contains any *.db file at any depth.
+has_db() { find "$1" -type f -name '*.db' -print -quit 2>/dev/null | grep -q .; }
+
+# Emit each artifact directory (NUL-separated) found under a project.
+# -prune stops find from descending into a matched artifact, which keeps
+# nested node_modules fast and avoids walking into venvs.
+find_artifacts() {
+    local project="$1"
+    find "$project" -depth -mindepth 1 \( \
+            -type d \( \
+                -name node_modules -o \
+                -name __pycache__ -o \
+                -name .pytest_cache -o \
+                -name .mypy_cache -o \
+                -name .ruff_cache -o \
+                -name '*.egg-info' \
+            \) \
+            -o -type d -exec test -e '{}/pyvenv.cfg' \; \
+            -o -type d -exec test -e '{}/CMakeCache.txt' \; \
+            -o -type d \( -name venv -o -name .venv -o -name env -o -name .env \) \
+                       -exec test -e '{}/bin/activate' \; \
+        \) -prune -print0 2>/dev/null
+}
+
+total_count=0
+skipped_count=0
+
+printf '\n'
+if [[ $EXECUTE -eq 1 ]]; then
+    printf '=== devclean: EXECUTE mode — artifacts will be DELETED ===\n'
+else
+    printf '=== devclean: DRY RUN — nothing will be deleted (use --execute) ===\n'
+fi
+printf 'Scanning projects under: %s\n\n' "$ROOT"
+
+# Collect candidates first so we can confirm before deleting anything.
+candidates=()
+for project in "$ROOT"/*/; do
+    [[ -d "$project" ]] || continue
+    [[ -L "${project%/}" ]] && continue   # don't descend into symlinked projects
+    while IFS= read -r -d '' art; do
+        candidates+=("$art")
+    done < <(find_artifacts "${project%/}")
+done
+
+if [[ ${#candidates[@]} -eq 0 ]]; then
+    printf 'No artifacts found. Nothing to do.\n'
+    exit 0
+fi
+
+for art in "${candidates[@]}"; do
+    if has_db "$art"; then
+        printf '  SKIP (contains *.db)  %s\n' "$art"
+        skipped_count=$((skipped_count + 1))
+        continue
+    fi
+    printf '  %-7s %5s  %s\n' "$([[ $EXECUTE -eq 1 ]] && echo remove || echo would)" \
+        "$(dirsize "$art")" "$art"
+    total_count=$((total_count + 1))
+done
+
+printf '\n%d artifact dir(s) targeted, %d skipped for safety.\n' \
+    "$total_count" "$skipped_count"
+
+if [[ $EXECUTE -eq 0 ]]; then
+    printf 'Dry run complete. Re-run with --execute to delete.\n'
+    exit 0
+fi
+
+if [[ $total_count -eq 0 ]]; then
+    printf 'Nothing to delete.\n'
+    exit 0
+fi
+
+if [[ $ASSUME_YES -eq 0 ]]; then
+    printf '\nDelete the %d directories listed above? [y/N] ' "$total_count"
+    read -r reply
+    case "$reply" in
+        [yY]|[yY][eE][sS]) ;;
+        *) printf 'Aborted.\n'; exit 0 ;;
+    esac
+fi
+
+removed=0
+for art in "${candidates[@]}"; do
+    has_db "$art" && continue
+    [[ -L "$art" ]] && continue
+    if rm -rf -- "$art"; then
+        removed=$((removed + 1))
+    else
+        printf '  FAILED to remove: %s\n' "$art" >&2
+    fi
+done
+
+printf '\nDone. Removed %d directories.\n' "$removed"
