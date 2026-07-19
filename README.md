@@ -27,7 +27,7 @@ dotfiles repository.
 Packages common to every machine:
 
 ```
-stow --no-folding -t $HOME common alacritty emacs git scripts tmux vim vscode
+stow --no-folding -t $HOME common alacritty emacs git scripts tmux nvim vim vscode
 ```
 
 Then the shell package for the host's login shell:
