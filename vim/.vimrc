@@ -108,6 +108,8 @@ Plug 'junegunn/fzf'                     " fuzzy finder
 Plug 'junegunn/fzf.vim'                 " fuzzy finder integration with vim
 Plug 'vimwiki/vimwiki'
 Plug 'tpope/vim-markdown'
+Plug 'dhruvasagar/vim-table-mode'       " live table alignment, :TableModeToggle
+Plug 'bullets-vim/bullets.vim'          " auto-continue/renumber bullet lists
 Plug 'mhinz/vim-startify'               " fancy start screen
 Plug 'dhruvasagar/vim-dotoo'            " org mode in vim
 nmap <Nop> <Plug>(dotoo-capture)
@@ -277,6 +279,10 @@ let g:vimwiki_list = [
 " VIM markdown
 """"""""""""""
 let g:markdown_fenced_languages = ['bash=sh', 'cpp', 'css', 'html', 'javascript', 'js=javascript', 'json=javascript', 'python', 'vim', 'xml']
+let g:markdown_folding = 1              " fold by heading
+let g:table_mode_corner = '|'           " markdown-style table separators
+" Prose ergonomics: soft wrap at word boundaries, indent continuations, spell
+autocmd FileType markdown setlocal wrap linebreak breakindent spell
 
 """"""""""""""
 " i3 config

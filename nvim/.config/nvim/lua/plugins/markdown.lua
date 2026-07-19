@@ -21,4 +21,19 @@ return {
       image = {},
     },
   },
+
+  -- Live table alignment (:TableModeToggle)
+  {
+    "dhruvasagar/vim-table-mode",
+    ft = "markdown",
+    init = function()
+      vim.g.table_mode_corner = "|" -- markdown-style separators, not org-style "+"
+    end,
+  },
+
+  -- Auto-continue and renumber bullet/numbered lists on Enter
+  {
+    "bullets-vim/bullets.vim",
+    ft = { "markdown", "text", "gitcommit" },
+  },
 }
