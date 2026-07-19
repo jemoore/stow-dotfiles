@@ -62,8 +62,8 @@ alias myip='ip -br -c a && (echo "external " && curl checkip.amazonaws.com)'
 alias weather="curl wttr.in/"
 alias shredit="shred -n 5 -u -z"
 alias cbg='feh --recursive --randomize --bg-scale /mnt/data/Documents/wallpaper/Bing/*'
-alias dlayout='$HOME/dev/repos/github/jemoore/dotfiles/desk-screenlayout.sh'
-alias pydev='source ~/.local/bin/scripts/pydev'
+alias dlayout='$SCRIPTS/desk-screenlayout.sh'
+alias pydev='source $SCRIPTS/pydev'
 alias pipupgrade='python -m pip install --upgrade pip'
 
 # GNU grep colour

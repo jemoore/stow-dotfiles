@@ -2,7 +2,7 @@
 (if (eq system-type 'gnu/linux)
     (progn
       (setq jeff/home "/home/jeff/")
-      (setq jeff/dotfiles (concat jeff/home "dev/github.com/jemoore/dotfiles/"))
+      (setq jeff/dotfiles (concat jeff/home "dev/github.com/jemoore/stow-dotfiles/"))
       (setq jeff/kb "/mnt/data/Documents/KB/")
       (setq jeff/md "/mnt/data/Documents/md/")))
 (if (eq system-type 'darwin)
@@ -17,7 +17,7 @@
       (if msystem
 	  (setq jeff/home "C:/msys64/home/jeffe/")
 	(setq jeff/home "C:/Users/jeffe/AppData/Roaming/"))
-      (setq jeff/dotfiles (concat jeff/home "dev/repos/github/jemoore/dotfiles/"))
+      (setq jeff/dotfiles (concat jeff/home "dev/github.com/jemoore/stow-dotfiles/"))
       (setq jeff/kb "e:/Documents/kb/")
       (setq jeff/md "e:/Documents/md/")))
       

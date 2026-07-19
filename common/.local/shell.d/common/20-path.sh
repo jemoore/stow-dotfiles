@@ -1,4 +1,4 @@
-export SCRIPTS=${HOME}/dev/repos/github.com/jemoore/dotfiles/scripts
+export SCRIPTS=${HOME}/.local/scripts
 
 pathappend() {
 	for ARG in "$@"; do
