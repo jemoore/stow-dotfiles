@@ -2239,12 +2239,13 @@ Plantuml requires java and graphviz to be installed.
 (use-package gptel
     :config
     (setq
-     gptel-model 'deepseek-r1:8b
+     gptel-model 'gemma4:latest
+     gptel-include-reasoning nil
      gptel-backend (gptel-make-ollama "Ollama"
                  :host "localhost:11434"
                  :stream t
                  ;;:models '(deepseek-r1:8b))))
-                 :models '(rnj-1))))
+                 :models '(gemma4:latest))))
 #+end_src
 
 * Custom files post config
