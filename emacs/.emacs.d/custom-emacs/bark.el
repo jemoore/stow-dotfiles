@@ -18,7 +18,7 @@
 
    ;; macOS
    ((eq system-type 'darwin)
-    (expand-file-name "~/Documents/Bookmarks.org"))
+    (expand-file-name "~/dev/github.com/jemoore/KB"))
 
    ;; Linux / BSD / everything else
    (t
