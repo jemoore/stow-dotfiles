@@ -13,10 +13,30 @@ Links to repos or sites I have acquire some setup examples:
 I also used Claude Opus 4.8 to help in fixing bugs and changing many of the packages.
 
 The following is some initial font setup.
+The very first line of the tangled =init.el= must be the =lexical-binding= cookie
+-- it is only honoured when it appears on line 1 of the file.  Emacs 31 warns
+loudly ("Missing 'lexical-binding' cookie in ...") for any file without it, and
+lexical binding is becoming the default, so we opt in explicitly.  Because this
+is the first block in the document, its first line is =init.el='s first line.
+
 #+begin_src emacs-lisp
+  ;;; init.el --- Generated from Emacs.org -*- lexical-binding: t; -*-
 
   ;; NOTE: init.el is now generated from Emacs.org.  Please edit that file
   ;;       in Emacs and init.el will be generated automatically!
+
+  ;; Variables that are set in private.el (loaded further down) or computed
+  ;; below.  Declaring them with `defvar' marks them special, so that under
+  ;; lexical binding they still behave as the global/dynamic variables the rest
+  ;; of this config expects -- and it silences the "assignment to free variable"
+  ;; byte-compiler warnings.
+  (defvar msystem nil "Non-nil when running under MSYS2/MinGW.")
+  (defvar jem/custom-emacs nil "Directory holding hand-written elisp for this config.")
+  (defvar jeff/home nil "Home directory, set in private.el.")
+  (defvar jeff/dev nil "Checkout root for personal repos, set in private.el.")
+  (defvar jeff/dotfiles nil "Path to the stow-dotfiles checkout, set in private.el.")
+  (defvar jeff/kb nil "Knowledge-base directory, set in private.el.")
+  (defvar jeff/md nil "Markdown notes directory, set in private.el.")
 
   ;; You will most likely need to adjust this font size for your system!
   (defvar efs/default-font-size 160)
@@ -81,8 +101,12 @@ Emacs has a built in package manager but it doesn't make it easy to automaticall
   ;; (this `setq' overrides the default) because some packages -- e.g. `popon',
   ;; the dependency of `corfu-terminal' used for terminal completion popups --
   ;; are only published there.
+  ;; NOTE: the old Org ELPA ("https://orgmode.org/elpa/") is *retired*.  It is
+  ;; still served, but frozen at org-20210929 (Org 9.5, Sept 2021).  Emacs 31
+  ;; bundles Org 9.8, so pinning to that archive would silently downgrade Org by
+  ;; four years and break org-element, the new export engine, org-persist, etc.
+  ;; Org is distributed through GNU ELPA now, so the archive is simply dropped.
   (setq package-archives '(("melpa" . "https://melpa.org/packages/")
-                           ("org" . "https://orgmode.org/elpa/")
                            ("elpa" . "https://elpa.gnu.org/packages/")
                            ("nongnu" . "https://elpa.nongnu.org/nongnu/")))
 
@@ -187,10 +211,28 @@ This section contains genral configuration of emacs settings.  UI related change
     (setq standard-indent 4)
 
     ;; When emacs asks for 'yes' or 'no', ask 'y' or 'n' instead.
-    (fset 'yes-or-no-p 'y-or-n-p)
+    ;; Emacs 28 added `use-short-answers', which is the supported way to do this.
+    ;; Do NOT use the old `(fset 'yes-or-no-p 'y-or-n-p)' trick any more: as of
+    ;; Emacs 30 `y-or-n-p' no longer reads with `read-key', it goes through the
+    ;; minibuffer *or*, when `use-dialog-box-p' is true, through
+    ;; `x-popup-dialog'.  Aliasing `yes-or-no-p' to it therefore routes every
+    ;; confirmation (including the `confirm-kill-emacs' one below) into that new
+    ;; code path.
+    (setq use-short-answers t)
+
+    ;; Never use native GUI dialog boxes.  On the macOS (NS) port `x-popup-dialog'
+    ;; opens a *modal* Cocoa dialog that blocks Emacs' entire event loop.  When
+    ;; that dialog ends up behind the frame, on another Space, or off-screen,
+    ;; Emacs looks completely frozen and cannot be quit -- which is exactly what
+    ;; happens when you press Cmd-Q with `confirm-kill-emacs' set, because a
+    ;; menu/mouse event makes `use-dialog-box-p' return t.  Forcing this to nil
+    ;; keeps every prompt in the minibuffer where you can actually answer it (and
+    ;; where C-g works).
+    (setq use-dialog-box nil)
+    (setq use-file-dialog nil)
 
     ;; Confirm to quit
-    (setq confirm-kill-emacs 'yes-or-no-p)
+    (setq confirm-kill-emacs #'y-or-n-p)
 
     ;; Don't resize the frames in steps; it looks weird, especially in tiling window
     ;; managers, where it can leave unseemly gaps.
@@ -258,10 +300,10 @@ This section contains genral configuration of emacs settings.  UI related change
   (setq blink-cursor-interval 0.6)
 
   ;; MISC OPTIMIZATIONS ----
-  ;; Emacs "updates" its ui more often than it needs to, so we slow it down
-  ;; slightly from 0.5s:
-  ;;; optimizations (froom Doom's core.el). See that file for descriptions.
-  (setq idle-update-delay 1.0)
+  ;; `idle-update-delay' was made obsolete in Emacs 30.1; the general "redisplay
+  ;; housekeeping" knob it used to be was split up, and what is left of it is
+  ;; `which-func-update-delay' (how often which-function-mode refreshes).
+  (setq which-func-update-delay 1.0)
 
   ;; Disabling bidi (bidirectional editing stuff)
   ;; Disables bi-directional editing (like if I wrote in both Hebrew and English)
@@ -280,8 +322,12 @@ This section contains genral configuration of emacs settings.  UI related change
   ;; treat underscore as part of word
   (defun underscore-part-of-word-hook ()
     (modify-syntax-entry ?_ "w"))
-  ;; linum makes viewing images slower
-  (add-hook 'image-mode-hook (lambda () (linum-mode -1))) ;; linum doesnt work well with image-mode
+  ;; Line numbers make viewing images slower, and they do not play well with
+  ;; image-mode.  NOTE: this used to call `linum-mode'.  `linum' was deprecated
+  ;; in Emacs 29 and its autoloads are *gone* in Emacs 31, so `(linum-mode -1)'
+  ;; now signals `void-function' every time an image buffer is opened.
+  ;; `display-line-numbers-mode' is the built-in replacement.
+  (add-hook 'image-mode-hook (lambda () (display-line-numbers-mode -1)))
   #+end_src
 * Basic UI Configuration
 
@@ -810,8 +856,11 @@ The =efs/org-font-setup= function configures various text faces to tweak the siz
                     (org-level-8 . 1.1)))
       (set-face-attribute (car face) nil :font "GoMono Nerd Font" :weight 'regular :height (cdr face)))
 
-    ;; Ensure that anything that should be fixed-pitch in Org files appears that way
-    (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
+    ;; Ensure that anything that should be fixed-pitch in Org files appears that way.
+    ;; NOTE: `:foreground nil' is rejected in Emacs 31 ("nil value is invalid,
+    ;; use `unspecified' instead").  `unspecified' is the correct way to say
+    ;; "don't set this attribute, inherit it".
+    (set-face-attribute 'org-block nil :foreground 'unspecified :inherit 'fixed-pitch)
     (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
     (set-face-attribute 'org-table nil   :inherit '(shadow fixed-pitch))
     (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
@@ -832,8 +881,13 @@ This section contains the basic configuration for =org-mode= plus the configurat
       (variable-pitch-mode 1)
       (visual-line-mode 1))
 
+    ;; Use the Org that ships with Emacs (9.8 on Emacs 31).  This block used to
+    ;; say `:pin org', which pointed at the retired orgmode.org ELPA -- see the
+    ;; note in "Package System Setup".  `:ensure nil' stops use-package from
+    ;; trying to install Org from an archive at all, which also avoids the
+    ;; classic "org is already loaded, mixed-version Org" mess.
     (use-package org
-      :pin org
+      :ensure nil
       :hook (org-mode . efs/org-mode-setup)
       :config
       (setq org-ellipsis " ▾")
@@ -1554,15 +1608,16 @@ you get useful completions even in buffers without an LSP server.
     :config
     (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 
-  ;; Corfu's completion popup is drawn with a child frame, which only works in
-  ;; GUI Emacs.  `corfu-terminal' re-implements the popup with overlays so it
-  ;; also works in a terminal (=emacs -nw=).  The mode only takes effect on
-  ;; terminal frames, so it is safe to enable unconditionally -- including under
-  ;; a daemon that serves both GUI and terminal clients.
-  (use-package corfu-terminal
-    :after corfu
-    :config
-    (corfu-terminal-mode +1))
+  ;; Corfu's completion popup is drawn with a child frame.  Historically child
+  ;; frames were GUI-only, so `corfu-terminal' re-implemented the popup with
+  ;; overlays for `emacs -nw'.  Emacs 31 supports child frames on TTY frames
+  ;; natively, so corfu now warns "`corfu-terminal' is not needed on Emacs 31"
+  ;; and the package is redundant.  Only load it on older Emacs.
+  (when (< emacs-major-version 31)
+    (use-package corfu-terminal
+      :after corfu
+      :config
+      (corfu-terminal-mode +1)))
 
 #+end_src
 
@@ -1608,7 +1663,11 @@ you get useful completions even in buffers without an LSP server.
   ;; NOTE: Make sure to configure a GitHub token before using this package!
   ;; - https://magit.vc/manual/forge/Token-Creation.html#Token-Creation
   ;; - https://magit.vc/manual/ghub/Getting-Started.html#Getting-Started
-  (use-package forge)
+  ;;
+  ;; `:after magit' keeps forge (and with it emacsql/closql/ghub and the forge
+  ;; database) from being pulled in before magit itself is loaded.
+  (use-package forge
+    :after magit)
 
 #+end_src
 
@@ -2216,8 +2275,10 @@ on [[macOS shell PATH]] (=exec-path-from-shell=).
 
 * EDIFF
 #+begin_src emacs-lisp
-  (setq ediff-split-window_function 'split-window-horizontally
-        ediff-window-setup-function 'ediff-setup-windows-plain)
+  ;; NOTE: this was `ediff-split-window_function' (underscore) for a long time,
+  ;; which is not a real variable, so the setting never took effect.
+  (setq ediff-split-window-function #'split-window-horizontally
+        ediff-window-setup-function #'ediff-setup-windows-plain)
   (defun jem-ediff-hook()
     (ediff-setup-keymap)
     (define-key ediff-mode-map "j" 'ediff-next-difference)

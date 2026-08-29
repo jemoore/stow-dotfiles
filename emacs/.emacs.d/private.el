@@ -1,3 +1,4 @@
+;;; private.el --- Machine-local paths -*- lexical-binding: t; -*-
 ;; set some variables used in configuration
 (if (eq system-type 'gnu/linux)
     (progn
