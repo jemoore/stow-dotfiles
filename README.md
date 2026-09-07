@@ -27,7 +27,7 @@ dotfiles repository.
 Packages common to every machine:
 
 ```
-stow --no-folding -t $HOME common alacritty emacs git kitty scripts tmux nvim vim vscode
+stow --no-folding -t $HOME common alacritty emacs git kitty scripts tmux nvim vim
 ```
 
 Then the shell package for the host's login shell:
@@ -39,3 +39,25 @@ stow --no-folding -t $HOME bash
 # macOS (zsh)
 stow --no-folding -t $HOME zsh
 ```
+
+## OS-specific packages
+
+Some applications expect their config in a different place on each OS, so those
+packages live under `linux/` and `macos/` and are stowed with `-d`:
+
+```
+# Linux
+stow --no-folding -d linux -t $HOME vim vscode
+
+# macOS
+stow --no-folding -d macos -t $HOME vim tmux vscode
+```
+
+### vscode
+
+VS Code reads its user config from `~/.config/Code/User` on Linux but from
+`~/Library/Application Support/Code/User` on macOS. The real `settings.json` and
+`keybindings.json` are kept once, in the top-level `vscode` package; the
+`linux/vscode` and `macos/vscode` packages contain relative symlinks back to
+them, so stow lands the files in the right place per OS without duplicating
+content. Do not stow the top-level `vscode` package directly.
