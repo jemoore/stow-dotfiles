@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+#
+# tdev - open a 3-pane development layout in tmux.
+#
+# LAYOUT
+#   +----------------+---------------------------+
+#   |                |                           |
+#   |   editor 1/3   |        main 2/3           |
+#   |                |                           |
+#   +----------------+---------------------------+
+#   |             shell (15% height)             |
+#   +--------------------------------------------+
+#
+# All three panes start in DIR (default: the current working directory, or the
+# current pane's directory when invoked from a tmux key binding).
+#
+# USAGE
+#   tdev [-s] [-n name] [dir]
+#
+#   -s        create a new tmux SESSION instead of a window in the current one
+#   -n name   name for the new window (or session); defaults to the basename
+#             of DIR
+#   dir       directory the panes start in; defaults to $PWD
+#
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: tdev [-s] [-n name] [dir]
+
+  -s        create a new tmux session instead of a new window
+  -n name   name for the window/session (default: basename of dir)
+  dir       starting directory for all panes (default: current directory)
+EOF
+}
+
+new_session=false
+name=""
+
+while getopts ":sn:h" opt; do
+  case "$opt" in
+    s) new_session=true ;;
+    n) name="$OPTARG" ;;
+    h) usage; exit 0 ;;
+    \?) echo "tdev: unknown option -$OPTARG" >&2; usage >&2; exit 1 ;;
+    :) echo "tdev: option -$OPTARG requires an argument" >&2; exit 1 ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+command -v tmux >/dev/null 2>&1 || { echo "tdev: tmux is not installed" >&2; exit 1; }
+
+dir="${1:-$PWD}"
+[ -d "$dir" ] || { echo "tdev: directory does not exist: $dir" >&2; exit 1; }
+dir="$(cd "$dir" && pwd -P)"
+
+[ -n "$name" ] || name="$(basename "$dir")"
+
+# Outside of tmux the only sensible thing to do is start a session.
+if [ -z "${TMUX:-}" ]; then
+  new_session=true
+fi
+
+if [ "$new_session" = true ]; then
+  # -d so we can lay the panes out before attaching/switching to it.
+  session="$(tmux new-session -d -s "$name" -c "$dir" -P -F '#{session_id}')"
+  left="$(tmux display-message -p -t "$session" '#{pane_id}')"
+else
+  window="$(tmux new-window -c "$dir" -n "$name" -P -F '#{window_id}')"
+  left="$(tmux display-message -p -t "$window" '#{pane_id}')"
+fi
+
+# Bottom pane spans the full width, so split it off first: 1/3 of the height.
+tmux split-window -v -l '15%' -c "$dir" -t "$left" >/dev/null
+
+# Then split the top half side by side; the new (right) pane takes 2/3.
+tmux split-window -h -l '66%' -c "$dir" -t "$left" >/dev/null
+
+# Start in the small top-left pane.
+tmux select-pane -t "$left"
+
+if [ "$new_session" = true ]; then
+  if [ -n "${TMUX:-}" ]; then
+    tmux switch-client -t "$session"
+  else
+    tmux attach-session -t "$session"
+  fi
+fi
