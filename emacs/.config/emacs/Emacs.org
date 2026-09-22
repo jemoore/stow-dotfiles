@@ -190,6 +190,17 @@ packages to this file.
 * Custom Files
 
 Load custom emacs lisp files here.
+
+=custom-file= is set to a *separate* file rather than left at its default.  When
+it is nil, the Customize interface (and anything that calls
+=customize-save-variable=, such as =package-install= updating
+=package-selected-packages=) appends a =custom-set-variables= block to
+=user-init-file= -- which here is the *generated* =init.el=.  Re-tangling this
+document rewrites =init.el= from scratch and silently discards that block.
+Pointing =custom-file= at =~/.emacs.d/custom.el= keeps machine-generated Custom
+state out of the tangle target so it survives.  It is loaded at the very end of
+the config, in [[Custom files post config]].
+
 #+begin_src emacs-lisp
   (setq jem/custom-emacs (expand-file-name "custom-emacs" user-emacs-directory))
   ;; load private file defining some variables
@@ -197,6 +208,7 @@ Load custom emacs lisp files here.
   (add-to-list 'load-path (directory-file-name (concat jem/custom-emacs "/lisp")))
   (setq bookmark-default-file (concat jem/custom-emacs "/bookmarks"))
   (setq custom-theme-directory (expand-file-name "themes" jem/custom-emacs))
+  (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
 #+end_src
 
 * macOS shell PATH
@@ -2001,9 +2013,28 @@ Dired is a built-in file manager for Emacs that does some pretty amazing things!
     :bind (("C-x C-j" . dired-jump))
     :custom ((dired-listing-switches "-agho --group-directories-first"))
     :config
+    ;; macOS ships BSD `ls', which understands neither `--group-directories-first'
+    ;; nor `--dired'.  When `ls' errors, Emacs 31's `dired-internal-noselect'
+    ;; kills the Dired buffer and returns nil; `find-file' then falls through to
+    ;; `(error "%s is a directory")', so both C-x C-f and M-x dired refuse to
+    ;; open any directory.  Prefer GNU ls (`gls', from `brew install coreutils')
+    ;; when it is installed, otherwise fall back to Emacs' own Lisp
+    ;; implementation of `ls', which does the directory grouping itself via
+    ;; `ls-lisp-dirs-first' and so does not need the GNU-only switch.
+    (when (eq system-type 'darwin)
+      (if (executable-find "gls")
+          (setq insert-directory-program "gls")
+        (require 'ls-lisp)
+        (setq ls-lisp-use-insert-directory-program nil
+              ls-lisp-dirs-first t
+              dired-listing-switches "-agho")))
+    ;; NOTE: `dired-single' is not installed (see the commented-out block below),
+    ;; so use the built-in equivalents.  `dired-find-alternate-file' reuses the
+    ;; current buffer instead of creating a new one per directory -- it is
+    ;; enabled at the end of this block.
     (evil-collection-define-key 'normal 'dired-mode-map
-      "h" 'dired-single-up-directory
-      "l" 'dired-single-buffer))
+      "h" 'dired-up-directory
+      "l" 'dired-find-alternate-file))
 
   ;; (use-package dired-single)
 
@@ -2365,6 +2396,11 @@ These are custom emacs-lisp files to load after other packages are loaded and av
 ;; save URLs to a file
 ;; not the same as emacs built in bookmark feature
 (load (expand-file-name "bark.el" jem/custom-emacs))
+
+;; Settings written by the Customize interface (see [[Custom Files]]).  Loaded
+;; last so it wins over the defaults set above, and missing on a fresh machine
+;; until something first saves a customization -- hence :noerror.
+(load custom-file :noerror)
 #+end_src
 
 * Omarchy desktop integration
