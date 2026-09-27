@@ -16,6 +16,25 @@ Shell config is split into three layers under `~/.local/shell.d/`:
 `~/.bashrc` and `~/.zshrc` each source `common/` first, then their own layer.
 Adding a new file to `common/` picks it up in both shells with no rc edits.
 
+## Emacs
+
+The `emacs` package targets `~/.config/emacs/` (XDG), not `~/.emacs.d/`.
+This is deliberate: Emacs only falls back to `~/.config/emacs` when
+`~/.emacs.d/` and `~/.emacs` are both absent (see `startup--xdg-or-homedot`
+in `startup.el`), and Omarchy's Emacs integration lives in `~/.config/emacs/`.
+Creating `~/.emacs.d` at all would silently take the whole config away from it.
+
+Only `Emacs.org`, `private.el` and `custom-emacs/` are stowed. `init.el` is
+*generated* by tangling `Emacs.org` (`C-c C-v t`), so it stays untracked --
+on a new machine, stow the package, open `Emacs.org`, tangle, and restart.
+Tangling overwrites the stock `init.el` that `omarchy-emacs-setup` drops there;
+that is fine, the tangled config loads Omarchy's `omarchy.el` itself.
+
+The remaining files in `~/.config/emacs/` (`omarchy.el`, `shell-bashrc`,
+`themes/omarchy-theme.el`) belong to the `omarchy-emacs` package and are left
+alone. If `omarchy-emacs-setup` is ever re-run it will warn about `~/.emacs.d`;
+there is nothing to answer, that directory no longer exists.
+
 ## Stowing
 
 The `--no-folding` flag instructs Stow to only create symbolic links for

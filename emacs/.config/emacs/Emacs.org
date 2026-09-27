@@ -1,5 +1,5 @@
 #+title: My Emacs Configuration
-#+PROPERTY: header-args:emacs-lisp :tangle ~/.emacs.d/init.el :mkdirp yes
+#+PROPERTY: header-args:emacs-lisp :tangle ~/.config/emacs/init.el :mkdirp yes
 
 * Welcome!
 
@@ -45,6 +45,18 @@ is the first block in the document, its first line is =init.el='s first line.
   ;; Make frame transparency overridable
   (defvar efs/frame-transparency '(100 . 100))
 
+  ;; Omarchy (https://omarchy.org/) ships an Emacs integration at
+  ;; ~/.config/emacs/omarchy.el that keeps the theme and font in sync with the
+  ;; desktop.  The font and colour-theme blocks below stand down when it is
+  ;; present; the integration itself is loaded at the very end of this file.
+  (defvar jem/omarchy-integration-file
+    (expand-file-name "omarchy.el" user-emacs-directory)
+    "Path to Omarchy's Emacs integration shim, when installed.")
+
+  (defun jem/omarchy-p ()
+    "Return non-nil when Omarchy's Emacs integration is available."
+    (file-exists-p jem/omarchy-integration-file))
+
 #+end_src
 
 ** Prerequsites
@@ -84,7 +96,8 @@ Only use system-type so that you can run emacs in server or client mode.
     (let ((env-var-value (getenv "MSYSTEM_PREFIX")))
       (if (and env-var-value (not (string-empty-p env-var-value)))
 	  (progn
-	    (setq package-gnupghome-dir "/home/jeff/.emacs.d/elpa/gnupg")
+	    (setq package-gnupghome-dir
+		  (expand-file-name "elpa/gnupg" user-emacs-directory))
 	    (setq msystem t))
 	(setq msystem nil)))
 #+end_src
@@ -128,7 +141,8 @@ Emacs has a built in package manager but it doesn't make it easy to automaticall
 Because =use-package-always-ensure= is =t=, every =use-package= form installs its
 package on first load.  When you *remove* or *replace* a package in this file (or
 mark a block =:tangle no=), the old package is no longer referenced but its files
-stay behind in =~/.emacs.d/elpa/=.
+stay behind in the =elpa/= directory under =user-emacs-directory=
+(=~/.config/emacs/elpa/= on this setup).
 
 To clean those out, run:
 
@@ -177,7 +191,7 @@ packages to this file.
 
 Load custom emacs lisp files here.
 #+begin_src emacs-lisp
-  (setq jem/custom-emacs "~/.emacs.d/custom-emacs")
+  (setq jem/custom-emacs (expand-file-name "custom-emacs" user-emacs-directory))
   ;; load private file defining some variables
   (load (expand-file-name "private.el" user-emacs-directory))
   (add-to-list 'load-path (directory-file-name (concat jem/custom-emacs "/lisp")))
@@ -375,23 +389,53 @@ The menu bar can sometimes be helpful and can be turned back on with =(menu-bar-
 
 ** Font Configuration
 
-I am using the **GoMono Nerd Font** fonts for this configuration.
-These will need to be downloaded and installed if not already installed or change the setting here to another installed font.
+I am using the **ShureTechMono Nerd Font** fonts for this configuration.
+These will need to be downloaded and installed if not already installed, or change
+=jem/font-family= below to another installed font.
+
+On Omarchy the font is not ours to choose: =omarchy-apply-font= mirrors whatever
+=omarchy font set= put in the terminal's config, and re-applies it live when that
+changes.  There =jem/font-family= is ignored and we only keep the fixed-pitch and
+variable-pitch faces following Omarchy's choice.
 
 #+begin_src emacs-lisp
+  (defvar jem/font-family "ShureTechMono Nerd Font"
+    "Font family to use when Omarchy is not managing the font.")
+
+  (defun jem/omarchy-font ()
+    "Return the family Omarchy wants, or nil when Omarchy isn't managing the font.
+Returns nil until the integration is loaded, which is deliberate: this file
+sets the faces once on the way past and again from the Omarchy block at the
+end, so the second call is the one that sees a family."
+    (and (fboundp 'omarchy-current-font)
+         (let ((family (omarchy-current-font)))
+           (and (stringp family) (not (string-empty-p family)) family))))
+
   (defun efs/set-font-faces ()
       ;; Fonts only apply to graphical frames; a terminal frame draws with the
       ;; host terminal's font.  Skip on ttys so this is a harmless no-op there
       ;; (and, under a daemon, on any terminal client frame).
       (when (display-graphic-p)
         (message "Setting faces!")
-        (set-face-attribute 'default nil :font "ShureTechMono Nerd Font" :height efs/default-font-size)
+        (let* ((omarchy-family (jem/omarchy-font))
+               (family (or omarchy-family jem/font-family)))
+          ;; Under Omarchy, `omarchy-apply-font' owns the `default' face: it
+          ;; mirrors the terminal's family and size, and on pgtk specifies an
+          ;; absolute *pixel* size so GTK's text-scaling-factor isn't applied
+          ;; twice.  Setting a point `:height' here would reintroduce exactly
+          ;; that double scaling, so leave `default' to Omarchy and only pin the
+          ;; pitch faces -- at `:height' 1.0, i.e. relative to whatever Omarchy
+          ;; picked, so they track it at any size.
+          (unless omarchy-family
+            (set-face-attribute 'default nil :font family :height efs/default-font-size))
 
-        ;; Set the fixed pitch face
-        (set-face-attribute 'fixed-pitch nil :font "ShureTechMono Nerd Font" :height efs/default-font-size)
+          ;; Set the fixed pitch face
+          (set-face-attribute 'fixed-pitch nil :family family
+                              :height (if omarchy-family 1.0 efs/default-font-size))
 
-        ;; Set the variable pitch face
-        (set-face-attribute 'variable-pitch nil :font "ShureTechMono Nerd Font" :height efs/default-variable-font-size :weight 'regular)))
+          ;; Set the variable pitch face
+          (set-face-attribute 'variable-pitch nil :family family :weight 'regular
+                              :height (if omarchy-family 1.0 efs/default-variable-font-size)))))
 
   ;; If running as daemon need to reset fonts/modeline after creating new frame.
   ;; `efs/set-font-faces' now guards on `display-graphic-p' itself, so it does
@@ -670,8 +714,13 @@ Org mode comma leader key bindings.
     ;; "Loading a theme can run Lisp code.  Really load? (y or n)" on startup.
     ;; In a terminal (`emacs -nw') or daemon with no one to answer, that prompt
     ;; blocks startup.  We trust our own theme, so load it without confirming.
-    ;; :init (load-theme 'ef-elea-light t))
-    :init (load-theme 'ef-dream t))
+    ;;
+    ;; Skipped under Omarchy, where the `omarchy' theme (loaded at the end of
+    ;; this file) supplies the colours.  Custom themes *stack*: leaving ef-dream
+    ;; enabled would let it leak through on every face omarchy-theme.el does not
+    ;; define, giving a half-themed frame.
+    ;; :init (unless (jem/omarchy-p) (load-theme 'ef-elea-light t)))
+    :init (unless (jem/omarchy-p) (load-theme 'ef-dream t)))
 #+end_src
 
 ** Better Modeline
@@ -1084,7 +1133,7 @@ You can add more =src= block templates below by copying one of the lines and cha
 #+begin_src emacs-lisp
   (require 'org-id)
   ;; add uuid as ID in property for linking
-  ;; stores id/links in ~/.emacs.d/.org-id-locations
+  ;; stores id/links in .org-id-locations under `user-emacs-directory'
   ;; use org-id-update-id-locations to update links if files moved/renamed
   (setq org-id-link-to-org-use-id t)
 #+end_src
@@ -1698,7 +1747,7 @@ Emacs' built in commenting functionality =comment-dwim= (usually bound to =M-;=)
 #+begin_src emacs-lisp
   (use-package yasnippet
     :config
-    (setq yas-snippet-dirs '("~/.emacs.d/snippets"))
+    (setq yas-snippet-dirs (list (expand-file-name "snippets" user-emacs-directory)))
     (yas-global-mode 1))
 #+end_src
 *** Create a snippet
@@ -2315,6 +2364,49 @@ These are custom emacs-lisp files to load after other packages are loaded and av
 ;; bark -> book mark
 ;; save URLs to a file
 ;; not the same as emacs built in bookmark feature
-;; (load (expand-file-name "bark.el" jem/custom-emacs))
-(load "~/.emacs.d/custom-emacs/bark.el")
+(load (expand-file-name "bark.el" jem/custom-emacs))
+#+end_src
+
+* Omarchy desktop integration
+
+On [[https://omarchy.org/][Omarchy]] the =omarchy-emacs= package keeps Emacs in step with the rest of the
+desktop.  Its entry point is =~/.config/emacs/omarchy.el=, a shim written by
+=omarchy-emacs-setup= that loads =/usr/share/omarchy-emacs/config/omarchy.el= --
+loading the shim rather than the implementation directly is what lets AUR
+upgrades land without re-running setup.  The implementation:
+
+- reads the generated palette from
+  =~/.local/state/omarchy/current/theme/omarchy-colors.el= and enables the
+  =omarchy= theme out of =~/.config/emacs/themes/=,
+- mirrors the active terminal's font family and size onto the =default= face,
+- installs =filenotify= watchers on =theme.name= and the terminal config so
+  =omarchy theme set= and =omarchy font set= are picked up live,
+- starts the Emacs server, hides the menu/tool/scroll bars, adds an 8px internal
+  border, points =shell-mode= at Omarchy's =shell-bashrc=, and adds
+  =delete-trailing-whitespace= to =before-save-hook=.
+
+Two ordering constraints shape the block below.
+
+It is loaded *last* so those faces and settings win over the packages configured
+above, and every theme enabled so far is disabled first -- see the note in
+[[Color Theme]] about themes stacking.
+
+=efs/set-font-faces= then runs a second time.  =omarchy-apply-font= only touches
+the =default= face, so this is what pulls =fixed-pitch= and =variable-pitch= onto
+the same family; it is also the first call in which =jem/omarchy-font= can see
+anything, since =omarchy-current-font= only exists once the shim is loaded.
+
+Live theme changes do not depend on any of this: the hook Omarchy installs at
+=~/.config/omarchy/hooks/theme-set.d/omarchy-emacs= runs =omarchy-restart-emacs=,
+which reaches the daemon over =emacsclient= and reloads =omarchy.el= by absolute
+path.
+
+The whole block is a no-op on machines without Omarchy.
+
+#+begin_src emacs-lisp
+(when (jem/omarchy-p)
+  ;; `disable-theme' mutates `custom-enabled-themes'; iterate over a copy.
+  (mapc #'disable-theme (copy-sequence custom-enabled-themes))
+  (load jem/omarchy-integration-file)
+  (efs/set-font-faces))
 #+end_src
