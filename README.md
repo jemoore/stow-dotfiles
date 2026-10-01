@@ -24,11 +24,33 @@ This is deliberate: Emacs only falls back to `~/.config/emacs` when
 in `startup.el`), and Omarchy's Emacs integration lives in `~/.config/emacs/`.
 Creating `~/.emacs.d` at all would silently take the whole config away from it.
 
-Only `Emacs.org`, `private.el` and `custom-emacs/` are stowed. `init.el` is
-*generated* by tangling `Emacs.org` (`C-c C-v t`), so it stays untracked --
-on a new machine, stow the package, open `Emacs.org`, tangle, and restart.
-Tangling overwrites the stock `init.el` that `omarchy-emacs-setup` drops there;
-that is fine, the tangled config loads Omarchy's `omarchy.el` itself.
+`init.el` and `early-init.el` are hand-written and tracked -- they are no
+longer tangled from an Org file. On a new machine, stow the package and start
+Emacs; packages install themselves on first launch. Note that this overwrites
+the stock `init.el` that `omarchy-emacs-setup` drops there.
+
+Stowed files: `init.el`, `early-init.el`, `private.el`, `custom-emacs/`.
+`private.el` holds machine-local path overrides only; macOS needs none, since
+`init.el`'s defaults already match it. `custom.el` is written by Customize and
+is deliberately untracked.
+
+One-time setup per machine:
+
+- `M-x jem/treesit-install-grammars` -- builds the tree-sitter grammars
+  (needs `git` and a C compiler). Until this runs, Go and Rust files have no
+  major mode at all; `init.el` says so at startup.
+- `M-x nerd-icons-install-fonts`, then restart Emacs.
+- Language servers, installed outside Emacs: `clangd`, `pylsp`, `gopls`,
+  `rust-analyzer`. Common Lisp uses `sly` + `sbcl`, not LSP.
+- Spellcheck needs `aspell` (`brew install aspell`); without it flyspell stays
+  off rather than erroring.
+
+`archived-Emacs.org` is the previous literate config, kept for reference until
+the new `init.el` has proven itself. It is not loaded or tangled.
+
+**Known gap:** the Omarchy desktop integration described in
+`archived-Emacs.org` has *not* been ported to the new `init.el`, so on Omarchy
+the theme/font sync and `omarchy.el` load do not happen yet.
 
 The remaining files in `~/.config/emacs/` (`omarchy.el`, `shell-bashrc`,
 `themes/omarchy-theme.el`) belong to the `omarchy-emacs` package and are left

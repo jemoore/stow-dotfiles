@@ -1,64 +1,39 @@
-;;; private.el --- Machine-local paths -*- lexical-binding: t; -*-
-;; set some variables used in configuration
-(if (eq system-type 'gnu/linux)
-    (progn
-      (setq jeff/home "/home/jeff/")
-      (setq jeff/dotfiles (concat jeff/home "dev/github.com/jemoore/stow-dotfiles/"))
-      (setq jeff/kb "/mnt/data/Documents/KB/")
-      (setq jeff/md "/mnt/data/Documents/md/")))
-(if (eq system-type 'darwin)
-    (progn
-      (setq jeff/home "/Users/jeff/")
-      (setq jeff/dev (concat jeff/home "dev/github.com/jemoore/"))
-      (setq jeff/dotfiles (concat jeff/dev "stow-dotfiles/"))
-      (setq jeff/kb (concat jeff/dev "KB/"))
-      (setq jeff/md (concat jeff/dev "mdnotes/"))))
-(if (eq system-type 'windows-nt)
-    (progn
-      (if msystem
-	  (setq jeff/home "C:/msys64/home/jeffe/")
-	(setq jeff/home "C:/Users/jeffe/AppData/Roaming/"))
-      (setq jeff/dotfiles (concat jeff/home "dev/github.com/jemoore/stow-dotfiles/"))
-      (setq jeff/kb "e:/Documents/kb/")
-      (setq jeff/md "e:/Documents/md/")))
-      
+;;; private.el --- Machine-local path overrides -*- lexical-binding: t; -*-
 
+;; Loaded by init.el immediately after its default paths are defined and
+;; before anything is derived from them.  init.el uses `defvar', which does
+;; not clobber an already-bound variable, so a plain `setq' here wins.
+;;
+;; The macOS defaults in init.el are already correct (~/dev/github.com/jemoore/...),
+;; so this file only needs to override the machines whose layout differs.
+;;
+;; Keep this file to path settings only.  Anything else belongs in init.el or
+;; in custom-emacs/.
 
+;;; Code:
 
-(defun jm-extract-and-create-org-table ()
-  (interactive)
-  (save-excursion
-    (goto-char (point-min))
-    (when (re-search-forward "Number_of_things\\s-*=" nil t)
-      (let ((start (line-end-position)))
-        (when (re-search-forward "Number_of_Abilities\\s-*=" nil t)
-          (let ((end (line-beginning-position)))
-            (with-temp-buffer
-              (insert "aaa");; (buffer-substring-no-properties start end))
-              ;; (goto-char (point-min))
-              ;; (while (re-search-forward "^\\s-*\\(Name\\|Number\\)\\s-*=\\s-*\\(.*\\)$" nil t)
-              ;;   (replace-match "| \\1 | \\2 |"))
-              ;; (org-mode)
-              ;; (org-table-align)
-              ;; (pop-to-buffer (current-buffer))))))))) 
-	      )))))))
+(pcase system-type
+  ;; macOS: init.el's defaults already match this machine.  Nothing to do.
+  ('darwin nil)
 
+  ('gnu/linux
+   (setq jem/home "/home/jeff/"
+         jem/dev "/home/jeff/dev/github.com/jemoore/"
+         jem/dotfiles "/home/jeff/dev/github.com/jemoore/stow-dotfiles/"
+         jem/kb "/mnt/data/Documents/KB/"
+         jem/md "/mnt/data/Documents/md/"))
 
-(defun jm-extract-and-create-org-table ()
-  (interactive)
-  (save-excursion
-    (goto-char (point-min))
-    (when (re-search-forward "Number_of_things\\s-*=" nil t)
-      (let ((start (line-end-position)))
-        (when (re-search-forward "Number_of_Abilities\\s-*=" nil t)
-          (let ((end (line-beginning-position))
-                (temp-buffer (generate-new-buffer "*temp-buffer*"))
-		(oldbuf (current-buffer)))
-            (with-current-buffer temp-buffer
-              (insert-buffer-substring oldbuf start end))
-              (goto-char (point-min))
-              (while (re-search-forward "^\\s-*\\(Name\\|Number\\)\\s-*=\\s-*\\(.*\\)$" nil t)
-                (replace-match "| \\1 | \\2 |"))
-              (org-mode)
-              (org-table-align)))))))
+  ('windows-nt
+   ;; MSYSTEM_PREFIX is set only under MSYS2/MinGW.
+   (let* ((msys (let ((v (getenv "MSYSTEM_PREFIX")))
+                  (and v (not (string-empty-p v)))))
+          (home (if msys "C:/msys64/home/jeffe/" "C:/Users/jeffe/AppData/Roaming/")))
+     (setq jem/home home
+           jem/dotfiles (concat home "dev/github.com/jemoore/stow-dotfiles/")
+           jem/kb "e:/Documents/kb/"
+           jem/md "e:/Documents/md/")
+     (when msys
+       (setq package-gnupghome-dir "/home/jeff/.emacs.d/elpa/gnupg")))))
 
+(provide 'private)
+;;; private.el ends here
